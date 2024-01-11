@@ -1,0 +1,9 @@
+host: '0.0.0.0'
+port: 50051
+check_host: '172.17.0.1'
+mysql:
+  host: '127.0.0.1'
+  default_port: 33061
+  Db_name: 'go-oj_user_srv'
+  user: 'root'
+  password: 'a1824900503'
