@@ -34,11 +34,13 @@ func Paginate(page, pageSize int) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
+// GetUserInfoList 获取用户信息列表
 func (s *UserServer) GetUserInfoList(ctx context.Context, req *proto.PageInfo) (*proto.UserListResponse, error) {
 	var users []model.User
-	result := global.DB.Find(&users)
+	var total int64
+	global.DB.Model(&model.User{}).Count(&total)
 	rsp := &proto.UserListResponse{}
-	rsp.Total = int32(result.RowsAffected)
+	rsp.Total = int32(total)
 	global.DB.Scopes(Paginate(int(req.PNum), int(req.PSize))).Find(&users)
 
 	for _, user := range users {
@@ -53,12 +55,12 @@ func (s *UserServer) GetUserInfoList(ctx context.Context, req *proto.PageInfo) (
 	return rsp, nil
 }
 
+// GetUserByNickname 通过用户名获取用户信息
 func (s *UserServer) GetUserByNickname(ctx context.Context, req *proto.NicknameRequest) (*proto.UserInfoResponse, error) {
 	user := model.User{}
-	user.Nickname = req.Nickname
-	result := global.DB.Where(&model.User{}).Find(&user)
-	if result.Error != nil {
-		return nil, result.Error
+	result := global.DB.Where(&model.User{Nickname: req.Nickname}).First(&user)
+	if result.RowsAffected == 0 {
+		return nil, status.Errorf(codes.NotFound, "用户不存在")
 	}
 	rsp := &proto.UserInfoResponse{
 		Id:       user.ID,
@@ -69,10 +71,13 @@ func (s *UserServer) GetUserByNickname(ctx context.Context, req *proto.NicknameR
 	return rsp, nil
 }
 
+// GetUserById 通过id获取用户信息
 func (s *UserServer) GetUserById(ctx context.Context, req *proto.IdRequest) (*proto.UserInfoResponse, error) {
 	user := model.User{}
-	user.ID = req.Id
-	global.DB.Where(&model.User{}).Find(&user)
+	result := global.DB.First(&user, req.Id)
+	if result.RowsAffected == 0 {
+		return nil, status.Errorf(codes.NotFound, "用户不存在")
+	}
 	rsp := &proto.UserInfoResponse{
 		Id:       user.ID,
 		Nickname: user.Nickname,
@@ -82,6 +87,7 @@ func (s *UserServer) GetUserById(ctx context.Context, req *proto.IdRequest) (*pr
 	return rsp, nil
 }
 
+// CreateUser 创建用户
 func (s *UserServer) CreateUser(ctx context.Context, req *proto.CreateUserInfo) (*proto.UserInfoResponse, error) {
 	result := global.DB.Where(&model.User{Nickname: req.Nickname}).Find(&model.User{})
 	if result.RowsAffected == 1 {
@@ -105,6 +111,7 @@ func (s *UserServer) CreateUser(ctx context.Context, req *proto.CreateUserInfo) 
 	return rsp, nil
 }
 
+// UpdateUser 更新用户信息
 func (s *UserServer) UpdateUser(ctx context.Context, req *proto.UpdateUserInfo) (*emptypb.Empty, error) {
 	//个人中心更新用户
 	var user model.User
@@ -116,11 +123,8 @@ func (s *UserServer) UpdateUser(ctx context.Context, req *proto.UpdateUserInfo) 
 	user.Nickname = req.Nickname
 	user.Gender = req.Gender
 	user.Role = req.Role
-
-	result = global.DB.Where(&model.User{Nickname: req.Nickname}).Find(&model.User{})
-	if result.RowsAffected == 1 {
-		return nil, status.Errorf(codes.AlreadyExists, "用户名已存在")
-	}
+	salt, encodedPwd := utils.EncodePassword(req.Password)
+	user.Password = salt + ":" + encodedPwd
 
 	result = global.DB.Save(&user)
 	if result.Error != nil {
@@ -130,9 +134,13 @@ func (s *UserServer) UpdateUser(ctx context.Context, req *proto.UpdateUserInfo) 
 	return &empty.Empty{}, nil
 }
 
-func (s *UserServer) CheckPassWord(ctx context.Context, req *proto.PasswordCheckInfo) (*proto.CheckResponse, error) {
+// CheckPassword 检查密码是否正确
+func (s *UserServer) CheckPassword(ctx context.Context, req *proto.PasswordCheckInfo) (*proto.CheckResponse, error) {
 	var user model.User
-	global.DB.Where(&model.User{Nickname: req.Nickname}).Find(&user)
+	result := global.DB.Where(&model.User{Nickname: req.Nickname}).Where(&model.User{BaseModel: model.BaseModel{ID: req.Id}}).First(&user)
+	if result.RowsAffected == 0 {
+		return nil, status.Errorf(codes.NotFound, "用户不存在")
+	}
 	res := utils.VerifyPassword(req.Password, user.Password)
 	return &proto.CheckResponse{Valid: res}, nil
 }

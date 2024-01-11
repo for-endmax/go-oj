@@ -17,7 +17,7 @@ func InitConfig() {
 
 func InitLocal() {
 	vLocal := viper.New()
-	vLocal.SetConfigName("config")   // 配置文件名称(无扩展名)
+	vLocal.SetConfigName("user_srv") // 配置文件名称(无扩展名)
 	vLocal.SetConfigType("yaml")     // 如果配置文件的名称中没有扩展名，则需要配置此项
 	vLocal.AddConfigPath("./config") // 查找配置文件所在的路径
 	vLocal.AddConfigPath(".")        // 还可以在工作目录中查找配置

@@ -5,6 +5,7 @@ type ServerConfig struct {
 	Port      int         `mapstructure:"default_port"`
 	Host      string      `mapstructure:"host"`
 	CheckHost string      `mapstructure:"check_host"`
+	Tags      []string    `mapstructure:"tags"`
 	Mysql     MySQLConfig `mapstructure:"mysql"`
 }
 
