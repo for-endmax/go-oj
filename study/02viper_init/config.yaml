@@ -1,0 +1,5 @@
+name: '02viper_init'
+
+consul:
+  host: '127.0.0.1'
+  port: 8500
