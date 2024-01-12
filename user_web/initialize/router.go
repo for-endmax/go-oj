@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"user_web/global"
+	"user_web/handler"
 	"user_web/mid"
 )
 
@@ -22,10 +23,10 @@ func InitRouter() {
 	// 用户路由
 	userGroup := global.GinEngine.Group("user")
 	{
-		userGroup.GET("/ping", func(ctx *gin.Context) {
-			ctx.JSON(http.StatusOK, gin.H{
-				"ping": "pong",
-			})
-		})
+		userGroup.GET("/list", mid.JWTAuth(), handler.GetUserList)   //获取用户列表
+		userGroup.POST("/login", handler.Login)                      //用户登录
+		userGroup.POST("/signup", handler.SignUp)                    // 用户注册
+		userGroup.POST("/update", mid.JWTAuth(), handler.UpdateUser) //修改用户信息
+		userGroup.POST("/add", mid.JWTAuth(), handler.AddUser)       //管理员添加用户
 	}
 }

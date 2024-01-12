@@ -97,7 +97,7 @@ func main() {
 	//TestGetUserInfoList()
 	//TestGetUserByNickname()
 	//TestGetUserById()
-	//TestCreateUser()
+	TestCreateUser()
 	//TestUpdateUser()
-	TestCheckPassword()
+	//TestCheckPassword()
 }
