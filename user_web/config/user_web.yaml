@@ -1,5 +1,4 @@
-name: '02viper_init'
-
+name: 'go-oj/user_web'
 consul:
   host: '127.0.0.1'
   port: 8500

@@ -4,15 +4,16 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"user_srv/initialize"
+	"user_web/initialize"
 )
 
 func main() {
 	initialize.InitLogger()       // 初始化日志
-	initialize.InitConfig()       // 读取配置信息
-	initialize.InitDB()           // 初始化MySQL
+	initialize.InitConfig()       // 初始化配置
 	initialize.GetPort()          // 获取端口
 	initialize.InitConsulClient() // 初始化consul客户端
+	initialize.GetGrpcClient()    // 获取user_srv的grpc客户端
+	initialize.InitRouter()       // 初始化路由
 	initialize.Run()              // 启动服务
 	initialize.Register()         // 服务注册
 	//接收终止信号
