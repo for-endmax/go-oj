@@ -5,9 +5,12 @@ import (
 	consulApi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-uuid"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"user_srv/global"
+	"user_srv/handler"
+	"user_srv/proto"
 )
 
 func InitConsulClient() {
@@ -23,6 +26,10 @@ func InitConsulClient() {
 
 // Register 服务注册
 func Register() {
+	//grpc实例
+	global.GrpcServer = grpc.NewServer()
+	//注册
+	proto.RegisterUserServer(global.GrpcServer, &handler.UserServer{})
 	//注册健康检查
 	grpc_health_v1.RegisterHealthServer(global.GrpcServer, health.NewServer())
 

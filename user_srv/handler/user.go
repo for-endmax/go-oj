@@ -37,12 +37,10 @@ func Paginate(page, pageSize int) func(db *gorm.DB) *gorm.DB {
 // GetUserInfoList 获取用户信息列表
 func (s *UserServer) GetUserInfoList(ctx context.Context, req *proto.PageInfo) (*proto.UserListResponse, error) {
 	var users []model.User
-	var total int64
-	global.DB.Model(&model.User{}).Count(&total)
-	rsp := &proto.UserListResponse{}
-	rsp.Total = int32(total)
-	global.DB.Scopes(Paginate(int(req.PNum), int(req.PSize))).Find(&users)
 
+	rsp := &proto.UserListResponse{}
+	result := global.DB.Scopes(Paginate(int(req.PNum), int(req.PSize))).Find(&users)
+	rsp.Total = int32(result.RowsAffected)
 	for _, user := range users {
 		userInfoRsp := proto.UserInfoResponse{
 			Id:       user.ID,

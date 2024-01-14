@@ -13,8 +13,9 @@ func main() {
 	initialize.InitDB()           // 初始化MySQL
 	initialize.GetPort()          // 获取端口
 	initialize.InitConsulClient() // 初始化consul客户端
-	initialize.Run()              // 启动服务
 	initialize.Register()         // 服务注册
+	initialize.Run()              // 启动服务
+
 	//接收终止信号
 	quit := make(chan os.Signal)
 	//接收control+c

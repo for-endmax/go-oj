@@ -11,7 +11,6 @@ type BaseModel struct {
 	CreatedAt time.Time `gorm:"column:add_time"` //column 定义别名
 	UpdatedAt time.Time `gorm:"column:update_time"`
 	DeletedAt gorm.DeletedAt
-	IsDeleted bool
 }
 
 // User 定义用户信息

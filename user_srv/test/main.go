@@ -94,10 +94,10 @@ func TestCheckPassword() {
 
 func main() {
 	initClient()
-	//TestGetUserInfoList()
+	TestGetUserInfoList()
 	//TestGetUserByNickname()
 	//TestGetUserById()
-	TestCreateUser()
+	//TestCreateUser()
 	//TestUpdateUser()
 	//TestCheckPassword()
 }
