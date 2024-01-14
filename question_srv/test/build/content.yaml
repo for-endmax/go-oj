@@ -9,4 +9,4 @@ mysql:
   port: 33061
   Db_name: 'go-oj_question_srv'
   user: 'root'
-  password: 'a1824900503'
+  password: 'admin123'
