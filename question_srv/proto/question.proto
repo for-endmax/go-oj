@@ -1,0 +1,108 @@
+syntax = "proto3";
+option go_package = "./proto";
+
+service Question{
+    rpc GetQuestionList(PageInfoRequest) returns (QuestionListInfoResponse); //查看题目列表
+    rpc GetQuestionInfo(GetQuestionInfoRequest) returns (QuestionInfoResponse); //通过id获取题目信息
+    rpc AddQuestion(AddQuestionRequest) returns (QuestionInfoResponse);//增加题目
+    rpc DelQuestion(DelQuestionRequest) returns (DelQuestionResponse);// 删除题目
+    rpc UpdateQuestion(UpdateQuestionRequest) returns (UpdateQuestionResponse);//修改题目
+
+    rpc GetTestInfo(GetTestRequest) returns (TestInfoResponse); //获取测试信息
+    rpc AddTest(AddTestRequest) returns (TestInfoResponse);//增加测试信息
+    rpc DelTest(DelTestRequest) returns (DelTestResponse);// 删除测试信息
+    rpc UpdateTest(UpdateTestRequest) returns (UpdateTestResponse);//修改测试信息
+}
+
+message PageInfoRequest{
+    int32 pNum=1;
+    int32 pSize=2;
+}
+
+message QuestionListInfoResponse{
+    int32 total=1;
+    repeated QuestionInfoResponse data=2;
+}
+
+message QuestionInfoResponse{
+    int32 id=1;
+    int32 seq=2;
+    string name=3;
+    string content=4;
+}
+
+message GetQuestionInfoRequest{
+    int32 id=1;
+}
+
+message AddQuestionRequest{
+    int32 seq=1;
+    string name=2;
+    string content=3;
+}
+
+message DelQuestionRequest{
+    int32 id=1;
+}
+
+message DelQuestionResponse{
+    bool success=1;
+}
+
+message UpdateQuestionRequest{
+    int32 id=1;
+    int32 seq=2;
+    string name=3;
+    string content=4;
+}
+
+message UpdateQuestionResponse{
+    bool success=1;
+}
+
+message GetTestRequest{
+    int32 qId=1;
+}
+
+message TestInfoResponse{
+    int32 id=1;
+    int32 qId=2;
+    int32 time_limit=3;
+    int32 mem_limit=4;
+    string input=5;
+    string output=6;
+}
+
+message AddTestRequest{
+    int32 qId=1;
+    int32 time_limit=2;
+    int32 mem_limit=3;
+    string input=4;
+    string output=5;
+}
+
+message DelTestRequest{
+    int32 qId=1;
+}
+
+message DelTestResponse{
+    bool success=1;
+}
+
+message UpdateTestRequest{
+    int32 id=1;
+    int32 qId=2;
+    int32 time_limit=3;
+    int32 mem_limit=4;
+    string input=5;
+    string output=6;
+}
+
+message UpdateTestResponse{
+    int32 id=1;
+    int32 qId=2;
+    int32 time_limit=3;
+    int32 mem_limit=4;
+    string input=5;
+    string output=6;
+}
