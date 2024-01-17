@@ -137,8 +137,84 @@ func (s *QuestionServer) UpdateQuestion(ctx context.Context, req *proto.UpdateQu
 	return &proto.UpdateQuestionResponse{Success: true}, nil
 }
 
-//
-//rpc GetTestInfo(GetTestRequest) returns (TestInfoResponse); //获取测试信息
-//rpc AddTest(AddTestRequest) returns (TestInfoResponse);//增加测试信息
-//rpc DelTest(DelTestRequest) returns (DelTestResponse);// 删除测试信息
-//rpc UpdateTest(UpdateTestRequest) returns (UpdateTestResponse);//修改测试信息
+//////////////////////////////////////////////////////////////////////////////////////
+
+// GetTestInfo 获取某个题目的所有测试信息
+func (s *QuestionServer) GetTestInfo(ctx context.Context, req *proto.GetTestRequest) (*proto.TestInfoListResponse, error) {
+	var tests []model.Test
+	result := global.DB.Where(&model.Test{QID: req.QId}).Find(&tests)
+	if result.RowsAffected == 0 {
+		return nil, status.Errorf(codes.NotFound, "测试信息不存在")
+	}
+	var rsp proto.TestInfoListResponse
+	rsp.Total = int32(result.RowsAffected)
+	for _, v := range tests {
+		rsp.Data = append(rsp.Data, &proto.TestInfoResponse{
+			Id:        v.ID,
+			QId:       v.QID,
+			TimeLimit: v.TimeLimit,
+			MemLimit:  v.MemLimit,
+			Input:     v.Input,
+			Output:    v.Output,
+		})
+	}
+	return &rsp, nil
+}
+
+// AddTest 增加测试信息
+func (s *QuestionServer) AddTest(ctx context.Context, req *proto.AddTestRequest) (*proto.TestInfoResponse, error) {
+	test := model.Test{
+		QID:       req.QId,
+		TimeLimit: req.TimeLimit,
+		MemLimit:  req.MemLimit,
+		Input:     req.Input,
+		Output:    req.Output,
+	}
+	result := global.DB.Create(&test)
+	if result.Error != nil {
+		return nil, status.Errorf(codes.Internal, "添加失败")
+	}
+	return &proto.TestInfoResponse{
+		Id:        test.ID,
+		QId:       test.QID,
+		TimeLimit: test.TimeLimit,
+		MemLimit:  test.MemLimit,
+		Input:     test.Input,
+		Output:    test.Output,
+	}, nil
+}
+
+// DelTest 删除测试信息
+func (s *QuestionServer) DelTest(ctx context.Context, req *proto.DelTestRequest) (*proto.DelTestResponse, error) {
+	result := global.DB.First(&model.Test{}, req.Id)
+	if result.RowsAffected == 0 {
+		return &proto.DelTestResponse{Success: false}, status.Errorf(codes.NotFound, "测试信息不存在")
+	}
+	result = global.DB.Delete(&model.Test{}, req.Id)
+	if result.RowsAffected == 0 {
+		return &proto.DelTestResponse{Success: false}, status.Errorf(codes.Internal, "删除测试信息出错")
+	}
+	return &proto.DelTestResponse{Success: true}, nil
+}
+
+// UpdateTest 修改测试信息
+func (s *QuestionServer) UpdateTest(ctx context.Context, req *proto.UpdateTestRequest) (*proto.UpdateTestResponse, error) {
+	var test model.Test
+	result := global.DB.First(&test, req.Id)
+	if result.RowsAffected == 0 {
+		return &proto.UpdateTestResponse{Success: false}, status.Errorf(codes.NotFound, "测试信息不存在")
+	}
+
+	test.QID = req.QId
+	test.TimeLimit = req.TimeLimit
+	test.MemLimit = req.MemLimit
+	test.Input = req.Input
+	test.Output = req.Output
+	result = global.DB.Updates(&test)
+	if result.RowsAffected == 0 {
+		return &proto.UpdateTestResponse{Success: false}, status.Errorf(codes.Internal, "测试信息更新失败")
+	}
+	return &proto.UpdateTestResponse{
+		Success: true,
+	}, nil
+}

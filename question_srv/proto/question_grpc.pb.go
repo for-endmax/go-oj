@@ -39,7 +39,7 @@ type QuestionClient interface {
 	AddQuestion(ctx context.Context, in *AddQuestionRequest, opts ...grpc.CallOption) (*QuestionInfoResponse, error)
 	DelQuestion(ctx context.Context, in *DelQuestionRequest, opts ...grpc.CallOption) (*DelQuestionResponse, error)
 	UpdateQuestion(ctx context.Context, in *UpdateQuestionRequest, opts ...grpc.CallOption) (*UpdateQuestionResponse, error)
-	GetTestInfo(ctx context.Context, in *GetTestRequest, opts ...grpc.CallOption) (*TestInfoResponse, error)
+	GetTestInfo(ctx context.Context, in *GetTestRequest, opts ...grpc.CallOption) (*TestInfoListResponse, error)
 	AddTest(ctx context.Context, in *AddTestRequest, opts ...grpc.CallOption) (*TestInfoResponse, error)
 	DelTest(ctx context.Context, in *DelTestRequest, opts ...grpc.CallOption) (*DelTestResponse, error)
 	UpdateTest(ctx context.Context, in *UpdateTestRequest, opts ...grpc.CallOption) (*UpdateTestResponse, error)
@@ -98,8 +98,8 @@ func (c *questionClient) UpdateQuestion(ctx context.Context, in *UpdateQuestionR
 	return out, nil
 }
 
-func (c *questionClient) GetTestInfo(ctx context.Context, in *GetTestRequest, opts ...grpc.CallOption) (*TestInfoResponse, error) {
-	out := new(TestInfoResponse)
+func (c *questionClient) GetTestInfo(ctx context.Context, in *GetTestRequest, opts ...grpc.CallOption) (*TestInfoListResponse, error) {
+	out := new(TestInfoListResponse)
 	err := c.cc.Invoke(ctx, Question_GetTestInfo_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ type QuestionServer interface {
 	AddQuestion(context.Context, *AddQuestionRequest) (*QuestionInfoResponse, error)
 	DelQuestion(context.Context, *DelQuestionRequest) (*DelQuestionResponse, error)
 	UpdateQuestion(context.Context, *UpdateQuestionRequest) (*UpdateQuestionResponse, error)
-	GetTestInfo(context.Context, *GetTestRequest) (*TestInfoResponse, error)
+	GetTestInfo(context.Context, *GetTestRequest) (*TestInfoListResponse, error)
 	AddTest(context.Context, *AddTestRequest) (*TestInfoResponse, error)
 	DelTest(context.Context, *DelTestRequest) (*DelTestResponse, error)
 	UpdateTest(context.Context, *UpdateTestRequest) (*UpdateTestResponse, error)
@@ -169,7 +169,7 @@ func (UnimplementedQuestionServer) DelQuestion(context.Context, *DelQuestionRequ
 func (UnimplementedQuestionServer) UpdateQuestion(context.Context, *UpdateQuestionRequest) (*UpdateQuestionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateQuestion not implemented")
 }
-func (UnimplementedQuestionServer) GetTestInfo(context.Context, *GetTestRequest) (*TestInfoResponse, error) {
+func (UnimplementedQuestionServer) GetTestInfo(context.Context, *GetTestRequest) (*TestInfoListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTestInfo not implemented")
 }
 func (UnimplementedQuestionServer) AddTest(context.Context, *AddTestRequest) (*TestInfoResponse, error) {

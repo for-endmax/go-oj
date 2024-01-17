@@ -8,7 +8,7 @@ service Question{
     rpc DelQuestion(DelQuestionRequest) returns (DelQuestionResponse);// 删除题目
     rpc UpdateQuestion(UpdateQuestionRequest) returns (UpdateQuestionResponse);//修改题目
 
-    rpc GetTestInfo(GetTestRequest) returns (TestInfoResponse); //获取测试信息
+    rpc GetTestInfo(GetTestRequest) returns (TestInfoListResponse); //获取测试信息
     rpc AddTest(AddTestRequest) returns (TestInfoResponse);//增加测试信息
     rpc DelTest(DelTestRequest) returns (DelTestResponse);// 删除测试信息
     rpc UpdateTest(UpdateTestRequest) returns (UpdateTestResponse);//修改测试信息
@@ -73,6 +73,12 @@ message TestInfoResponse{
     string output=6;
 }
 
+message  TestInfoListResponse{
+    int32 total=1;
+    repeated TestInfoResponse data=2;
+}
+
+
 message AddTestRequest{
     int32 qId=1;
     int32 time_limit=2;
@@ -82,7 +88,7 @@ message AddTestRequest{
 }
 
 message DelTestRequest{
-    int32 qId=1;
+    int32 id=1;
 }
 
 message DelTestResponse{
@@ -99,10 +105,5 @@ message UpdateTestRequest{
 }
 
 message UpdateTestResponse{
-    int32 id=1;
-    int32 qId=2;
-    int32 time_limit=3;
-    int32 mem_limit=4;
-    string input=5;
-    string output=6;
+    bool success=1;
 }

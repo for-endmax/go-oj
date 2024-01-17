@@ -79,11 +79,64 @@ func TestUpdateQuestion() {
 	}
 	fmt.Println(success)
 }
+
+func TestGetTestInfo() {
+	req := proto.GetTestRequest{QId: 5}
+	info, err := client.GetTestInfo(context.Background(), &req)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(info.Total)
+	for _, v := range info.Data {
+		fmt.Println(v.Id, v.QId, v.TimeLimit, v.MemLimit, v.Input, v.Output)
+	}
+}
+
+func TestAddTest() {
+	req := proto.AddTestRequest{
+		QId:       5,
+		TimeLimit: 100,
+		MemLimit:  100,
+		Input:     "111111",
+		Output:    "222222",
+	}
+	info, err := client.AddTest(context.Background(), &req)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(info.Id, info.QId, info.MemLimit, info.TimeLimit, info.Input, info.Output)
+}
+
+func TestDelTest() {
+	req := proto.DelTestRequest{Id: 9}
+	info, err := client.DelTest(context.Background(), &req)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(info.Success)
+}
+
+func TestUpdateTest() {
+	req := proto.UpdateTestRequest{
+		Id:  3,
+		QId: 5,
+	}
+	info, err := client.UpdateTest(context.Background(), &req)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(info.Success)
+}
 func main() {
 	initClient()
-	TestGetQuestionList()
-	TestGetQuestionInfo()
-	TestAddQuestion()
-	TestDelQuestion()
-	TestUpdateQuestion()
+	//TestGetQuestionList()
+	//TestGetQuestionInfo()
+	//TestAddQuestion()
+	//TestDelQuestion()
+	//TestUpdateQuestion()
+
+	//TestGetTestInfo()
+	//TestAddTest()
+	//TestDelTest()
+	//TestUpdateTest()
 }
