@@ -100,6 +100,6 @@ func main() {
 	initialize.InitConfig() //读取配置信息
 	initialize.InitDB()     //初始化MySQL
 
-	insertData() // 建表并插入数据
+	//insertData() // 建表并插入数据
 
 }

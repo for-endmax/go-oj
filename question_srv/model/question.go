@@ -16,8 +16,8 @@ type BaseModel struct {
 // Question 定义用户信息
 type Question struct {
 	BaseModel
-	Seq     int32  `gorm:"type: int comment '序号';index: idx_seq,unique"`
-	Name    string `gorm:"type: varchar(20) comment '名称';index: idx_name,unique"`
+	Seq     int32  `gorm:"type: int comment '序号'"`
+	Name    string `gorm:"type: varchar(20) comment '名称'"`
 	Content string `gorm:"type: text comment '名称'"`
 }
 
