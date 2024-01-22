@@ -204,10 +204,17 @@ func (s *QuestionServer) DelTest(ctx context.Context, req *proto.DelTestRequest)
 
 // UpdateTest 修改测试信息
 func (s *QuestionServer) UpdateTest(ctx context.Context, req *proto.UpdateTestRequest) (*proto.UpdateTestResponse, error) {
+	//是否有测试信息
 	var test model.Test
 	result := global.DB.First(&test, req.Id)
 	if result.RowsAffected == 0 {
 		return &proto.UpdateTestResponse{Success: false}, status.Errorf(codes.NotFound, "测试信息不存在")
+	}
+
+	//要修改的req是否合法
+	result = global.DB.Where("q_id = ?", req.QId).First(&model.Test{})
+	if result.RowsAffected == 1 {
+		return nil, status.Errorf(codes.AlreadyExists, "对应的题目已有测试信息")
 	}
 
 	test.QID = req.QId
