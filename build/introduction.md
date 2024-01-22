@@ -44,32 +44,7 @@ CREATE DATABASE `go-oj_question_srv` DEFAULT CHARACTER SET utf8mb4
 ```
 
 ## 3.向consul写入远程配置并建表
-```shell
-cd user_srv
-go run test/build/main.go
-```
-```shell
-cd user_web
-go run test/build/main.go
-```
 
-```shell
-cd question_srv
-go run test/build/main.go
-```
 
 ## 4.依次启动srv服务与web服务
-```shell
-cd user_srv
-go run main.go
-```
-```shell
-cd user_web
-go run main.go
-```
-
-```shell
-cd question_srv
-go run main.go
-```
 

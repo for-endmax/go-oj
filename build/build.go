@@ -9,10 +9,7 @@ import (
 )
 
 // writeConfig2Consul 向consul写入配置信息
-func writeConfig2Consul() {
-	url := "http://127.0.0.1:8500/v1/kv/go-oj/question_web"
-	data := "./test/build/content.yaml"
-
+func writeConfig2Consul(url string, data string) {
 	// 读取文件内容
 	contents, err := os.ReadFile(data)
 	if err != nil {
@@ -48,5 +45,9 @@ func writeConfig2Consul() {
 }
 
 func main() {
-	writeConfig2Consul() //写入配置信息
+	// 向consul写入各个服务的具体配置
+	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/user_srv", "./user_srv_content.yaml")
+	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/user_web", "./user_web_content.yaml")
+	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/question_srv", "./question_srv_content.yaml")
+	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/question_web", "./question_web_content.yaml")
 }
