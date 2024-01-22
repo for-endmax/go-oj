@@ -42,9 +42,14 @@ mysql -uroot -padmin123
 CREATE DATABASE `go-oj_user_srv` DEFAULT CHARACTER SET utf8mb4
 CREATE DATABASE `go-oj_question_srv` DEFAULT CHARACTER SET utf8mb4
 ```
+建表
+> 运行每个模块中test/build文件
 
-## 3.向consul写入远程配置并建表
-
+## 3.向consul写入远程配置
+```shell
+cd build
+go run build.go
+```
 
 ## 4.依次启动srv服务与web服务
 
