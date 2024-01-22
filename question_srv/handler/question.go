@@ -163,6 +163,11 @@ func (s *QuestionServer) GetTestInfo(ctx context.Context, req *proto.GetTestRequ
 
 // AddTest 增加测试信息
 func (s *QuestionServer) AddTest(ctx context.Context, req *proto.AddTestRequest) (*proto.TestInfoResponse, error) {
+	result := global.DB.Where("q_id = ?", req.QId).First(&model.Test{})
+	if result.RowsAffected == 1 {
+		return nil, status.Errorf(codes.AlreadyExists, "对应的题目已有测试信息")
+	}
+
 	test := model.Test{
 		QID:       req.QId,
 		TimeLimit: req.TimeLimit,
@@ -170,7 +175,7 @@ func (s *QuestionServer) AddTest(ctx context.Context, req *proto.AddTestRequest)
 		Input:     req.Input,
 		Output:    req.Output,
 	}
-	result := global.DB.Create(&test)
+	result = global.DB.Create(&test)
 	if result.Error != nil {
 		return nil, status.Errorf(codes.Internal, "添加失败")
 	}
