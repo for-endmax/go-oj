@@ -13,7 +13,7 @@ var (
 	ServerConfig      config.ServerConfig  // 远程配置
 	QuestionSrvClient proto.QuestionClient // question_srv的grpc客户端
 	GinEngine         *gin.Engine          // gin
-	ConuslClient      *consulApi.Client    // consul客户端
+	ConsulClient      *consulApi.Client    // consul客户端
 	ServeID           string               // 服务id
 	Trans             ut.Translator        //声明一个全局翻译器
 )

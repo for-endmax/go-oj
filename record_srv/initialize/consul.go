@@ -5,10 +5,14 @@ import (
 	consulApi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-uuid"
 	"go.uber.org/zap"
-	"question_web/global"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
+	"record_srv/global"
+	"record_srv/handler"
+	"record_srv/proto"
 )
 
-// InitConsulClient 初始化consul客户端
 func InitConsulClient() {
 	cfg := consulApi.DefaultConfig()
 	cfg.Address = fmt.Sprintf("%s:%d", global.LocalConfig.Consul.Host, global.LocalConfig.Consul.Port)
@@ -22,35 +26,40 @@ func InitConsulClient() {
 
 // Register 服务注册
 func Register() {
-	//服务注册
+	//grpc实例
+	global.GrpcServer = grpc.NewServer()
+	//注册
+	proto.RegisterRecordServer(global.GrpcServer, &handler.RecordServer{})
+	//注册健康检查
+	grpc_health_v1.RegisterHealthServer(global.GrpcServer, health.NewServer())
+
 	//生成对应的检查对象
 	check := &consulApi.AgentServiceCheck{
-		HTTP:                           fmt.Sprintf("http://%s:%d/health", global.ServerConfig.CheckHost, global.ServerConfig.Port),
+		GRPC:                           fmt.Sprintf("%s:%d", global.ServerConfig.CheckHost, global.ServerConfig.Port),
 		Timeout:                        "5s",
 		Interval:                       "5s",
 		DeregisterCriticalServiceAfter: "15s",
 	}
-
+	//生成注册对象
+	registration := new(consulApi.AgentServiceRegistration)
+	registration.Name = global.LocalConfig.Name
 	global.ServeID, _ = uuid.GenerateUUID()
-	srv := &consulApi.AgentServiceRegistration{
-		ID:      global.ServeID,           // 服务唯一ID
-		Name:    global.LocalConfig.Name,  // 服务名称
-		Tags:    global.ServerConfig.Tags, // 服务标签
-		Address: global.ServerConfig.CheckHost,
-		Port:    global.ServerConfig.Port,
-		Check:   check,
-	}
-	err := global.ConsulClient.Agent().ServiceRegister(srv)
+	registration.ID = global.ServeID
+	registration.Port = global.ServerConfig.Port
+	registration.Tags = global.ServerConfig.Tags
+	registration.Address = global.ServerConfig.CheckHost
+	registration.Check = check
+	//time.Sleep(time.Millisecond * 1000)
+
+	err := global.ConsulClient.Agent().ServiceRegister(registration)
 	if err != nil {
-		zap.S().Error("服务注册失败")
 		panic(err)
 	}
 	zap.S().Info("服务注册成功")
+
 }
 
-// UnRegister 服务注销
 func UnRegister() {
-	//服务注销
 	err := global.ConsulClient.Agent().ServiceDeregister(global.ServeID)
 	if err != nil {
 		zap.S().Info("注销失败", err)

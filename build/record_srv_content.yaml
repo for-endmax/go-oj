@@ -1,0 +1,12 @@
+host: '0.0.0.0'
+default_port: 50053
+check_host: '172.17.0.1'
+tags:
+  - 'go-oj'
+  - 'srv'
+mysql:
+  host: '127.0.0.1'
+  port: 33061
+  Db_name: 'go-oj_record_srv'
+  user: 'root'
+  password: 'admin123'

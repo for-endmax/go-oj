@@ -1,0 +1,58 @@
+syntax = "proto3";
+option go_package = "./proto";
+
+service Record{
+  rpc CreateRecord(CreateRecordRequest) returns (RecordInfo);  //创建记录
+  rpc GetAllRecordByUID(UIDRequest) returns (RecordInfoList);  //根据用户id查询记录
+  rpc GetRecordByID(IDRequest) returns (RecordInfo); //根据记录id查询记录
+  rpc UpdateRecord(UpdateRecordRequest) returns (RecordInfo); //更新记录状态信息
+}
+
+
+
+message CreateRecordRequest{
+  int32 uID=1;
+  int32 qID=2;
+  string lang=3;
+  int32 status=4;
+  int32 err_code=5;
+  string err_msg=6;
+  int32 time_limit=7;
+  int32 mem_limit=8;
+  string submit_code=9;
+}
+
+message RecordInfo{
+  int32 uID=1;
+  int32 qID=2;
+  string lang=3;
+  int32 status=4;
+  int32 err_code=5;
+  string err_msg=6;
+  int32 time_limit=7;
+  int32 mem_limit=8;
+  int32 ID=9;
+  string submit_code=10;
+}
+
+message RecordInfoList{
+  int32 total=1;
+  repeated RecordInfo data=2;
+}
+
+message UIDRequest{
+  int32 uid=1;
+  int32 pNum=2;
+  int32 pSize=3;
+}
+
+message IDRequest{
+  int32 id=1;
+}
+
+message UpdateRecordRequest{
+  int32 ID=1;
+  int32 status=2;
+  int32 err_code=3;
+  string err_msg=4;
+}

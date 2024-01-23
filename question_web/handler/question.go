@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"question_web/form"
 	"question_web/global"
-	"question_web/global/response"
 	"question_web/proto"
+	"question_web/response"
 	"strconv"
 	"strings"
 )

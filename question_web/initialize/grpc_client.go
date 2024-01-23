@@ -11,7 +11,7 @@ import (
 // GetGrpcClient 获取下层服务的grpc客户端
 func GetGrpcClient() {
 	// 通过服务名称查询信息
-	data, err := global.ConuslClient.Agent().ServicesWithFilter(fmt.Sprintf("Service == \"%s\"", global.ServerConfig.QuestionSrvInfo.Name))
+	data, err := global.ConsulClient.Agent().ServicesWithFilter(fmt.Sprintf("Service == \"%s\"", global.ServerConfig.QuestionSrvInfo.Name))
 	if err != nil {
 		zap.S().Errorw("向consul查询服务出错")
 		return

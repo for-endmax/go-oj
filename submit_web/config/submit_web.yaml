@@ -1,0 +1,4 @@
+name: 'go-oj/submit_web'
+consul:
+  host: '127.0.0.1'
+  port: 8500

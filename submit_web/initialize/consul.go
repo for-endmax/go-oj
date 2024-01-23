@@ -5,7 +5,7 @@ import (
 	consulApi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-uuid"
 	"go.uber.org/zap"
-	"question_web/global"
+	"submit_web/global"
 )
 
 // InitConsulClient 初始化consul客户端

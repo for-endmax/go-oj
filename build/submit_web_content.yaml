@@ -1,0 +1,8 @@
+host: '0.0.0.0'
+default_port: 8083
+check_host: '172.17.0.1'
+tags:
+  - 'go-oj'
+  - 'web'
+record_srv:
+  name: 'go-oj/record_srv'
