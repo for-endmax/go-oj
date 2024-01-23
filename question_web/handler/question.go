@@ -32,7 +32,7 @@ func HandleGrpcErrorToHttp(err error, c *gin.Context) {
 				})
 			case codes.AlreadyExists:
 				c.JSON(http.StatusBadRequest, gin.H{
-					"msg": "题目已存在",
+					"msg": "已存在",
 				})
 			case codes.InvalidArgument:
 				c.JSON(http.StatusBadRequest, gin.H{
@@ -254,6 +254,10 @@ func UpdateQuestion(c *gin.Context) {
 
 // GetTestInfo 获取qid对应的所有测试信息
 func GetTestInfo(c *gin.Context) {
+	//验证用户权限
+	if !CheckRole(c) {
+		return
+	}
 	// 获取get参数
 	qID, err := strconv.Atoi(c.Query("q_id"))
 	if err != nil {
@@ -272,11 +276,9 @@ func GetTestInfo(c *gin.Context) {
 	var testInfos []response.TestInfo
 	for _, v := range rsp.Data {
 		testInfos = append(testInfos, response.TestInfo{
-			QID:       v.QId,
-			TimeLimit: v.TimeLimit,
-			MemLimit:  v.MemLimit,
-			Input:     v.Input,
-			Output:    v.Output,
+			QID:    v.QId,
+			Input:  v.Input,
+			Output: v.Output,
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -299,11 +301,9 @@ func AddTestInfo(c *gin.Context) {
 	}
 	// 调用rpc
 	_, err := global.QuestionSrvClient.AddTest(context.Background(), &proto.AddTestRequest{
-		QId:       addTestForm.QID,
-		TimeLimit: addTestForm.TimeLimit,
-		MemLimit:  addTestForm.MemLimit,
-		Input:     addTestForm.Input,
-		Output:    addTestForm.Output,
+		QId:    addTestForm.QID,
+		Input:  addTestForm.Input,
+		Output: addTestForm.Output,
 	})
 	if err != nil {
 		HandleGrpcErrorToHttp(err, c)
@@ -351,12 +351,10 @@ func UpdateTestInfo(c *gin.Context) {
 	}
 	// 调用rpc
 	_, err := global.QuestionSrvClient.UpdateTest(context.Background(), &proto.UpdateTestRequest{
-		Id:        updateTestForm.ID,
-		QId:       updateTestForm.QID,
-		TimeLimit: updateTestForm.TimeLimit,
-		MemLimit:  updateTestForm.MemLimit,
-		Input:     updateTestForm.Input,
-		Output:    updateTestForm.Output,
+		Id:     updateTestForm.ID,
+		QId:    updateTestForm.QID,
+		Input:  updateTestForm.Input,
+		Output: updateTestForm.Output,
 	})
 	if err != nil {
 		HandleGrpcErrorToHttp(err, c)

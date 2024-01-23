@@ -40,11 +40,16 @@ func insertData() {
 		}
 
 		test := model.Test{
-			QID:       int32(i),
-			TimeLimit: 500,
-			MemLimit:  3000,
-			Input:     string(jsonString),
-			Output:    string(jsonString),
+			QID:    int32(i),
+			Input:  string(jsonString),
+			Output: string(jsonString),
+		}
+
+		global.DB.Create(&test)
+		test = model.Test{
+			QID:    int32(i),
+			Input:  string(jsonString) + "123",
+			Output: string(jsonString) + "123",
 		}
 		global.DB.Create(&test)
 	}

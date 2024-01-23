@@ -13,21 +13,19 @@ type BaseModel struct {
 	DeletedAt gorm.DeletedAt
 }
 
-// Question 定义用户信息
+// Question 定义题目信息
 type Question struct {
 	BaseModel
 	Seq     int32  `gorm:"type: int comment '序号'"`
 	Name    string `gorm:"type: varchar(20) comment '名称'"`
 	Content string `gorm:"type: text comment '名称'"`
+	Tests   []Test `gorm:"foreignKey:q_id"`
 }
 
 // Test 测试信息表
 type Test struct {
 	BaseModel
-	Question  Question `gorm:"foreignKey:q_id"`
-	QID       int32    `gorm:"type: int comment '对应的题目id';column:q_id"` // 对应的问题ID
-	TimeLimit int32    `gorm:"type: int comment '时间上限/毫秒'"`
-	MemLimit  int32    `gorm:"type: int comment '内存上限/KB'"`
-	Input     string   `gorm:"type: text comment '测试JSON数据输入'"`
-	Output    string   `gorm:"type: text comment '测试JSON数据输出'"`
+	QID    int32  `gorm:"type: int comment '对应的题目id';column:q_id"` // 对应的问题ID
+	Input  string `gorm:"type: text comment '测试JSON数据输入'"`
+	Output string `gorm:"type: text comment '测试JSON数据输出'"`
 }

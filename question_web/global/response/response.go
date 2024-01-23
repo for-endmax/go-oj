@@ -17,9 +17,7 @@ type QuestionBrief struct {
 
 // TestInfo 测试数据
 type TestInfo struct {
-	QID       int32  `json:"q_id"`
-	TimeLimit int32  `json:"time_limit"`
-	MemLimit  int32  `json:"mem_limit"`
-	Input     string `json:"input"`
-	Output    string `json:"output"`
+	QID    int32  `json:"q_id"`
+	Input  string `json:"input"`
+	Output string `json:"output"`
 }

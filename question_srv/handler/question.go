@@ -150,12 +150,10 @@ func (s *QuestionServer) GetTestInfo(ctx context.Context, req *proto.GetTestRequ
 	rsp.Total = int32(result.RowsAffected)
 	for _, v := range tests {
 		rsp.Data = append(rsp.Data, &proto.TestInfoResponse{
-			Id:        v.ID,
-			QId:       v.QID,
-			TimeLimit: v.TimeLimit,
-			MemLimit:  v.MemLimit,
-			Input:     v.Input,
-			Output:    v.Output,
+			Id:     v.ID,
+			QId:    v.QID,
+			Input:  v.Input,
+			Output: v.Output,
 		})
 	}
 	return &rsp, nil
@@ -163,29 +161,21 @@ func (s *QuestionServer) GetTestInfo(ctx context.Context, req *proto.GetTestRequ
 
 // AddTest 增加测试信息
 func (s *QuestionServer) AddTest(ctx context.Context, req *proto.AddTestRequest) (*proto.TestInfoResponse, error) {
-	result := global.DB.Where("q_id = ?", req.QId).First(&model.Test{})
-	if result.RowsAffected == 1 {
-		return nil, status.Errorf(codes.AlreadyExists, "对应的题目已有测试信息")
-	}
 
 	test := model.Test{
-		QID:       req.QId,
-		TimeLimit: req.TimeLimit,
-		MemLimit:  req.MemLimit,
-		Input:     req.Input,
-		Output:    req.Output,
+		QID:    req.QId,
+		Input:  req.Input,
+		Output: req.Output,
 	}
-	result = global.DB.Create(&test)
+	result := global.DB.Create(&test)
 	if result.Error != nil {
 		return nil, status.Errorf(codes.Internal, "添加失败")
 	}
 	return &proto.TestInfoResponse{
-		Id:        test.ID,
-		QId:       test.QID,
-		TimeLimit: test.TimeLimit,
-		MemLimit:  test.MemLimit,
-		Input:     test.Input,
-		Output:    test.Output,
+		Id:     test.ID,
+		QId:    test.QID,
+		Input:  test.Input,
+		Output: test.Output,
 	}, nil
 }
 
@@ -211,15 +201,7 @@ func (s *QuestionServer) UpdateTest(ctx context.Context, req *proto.UpdateTestRe
 		return &proto.UpdateTestResponse{Success: false}, status.Errorf(codes.NotFound, "测试信息不存在")
 	}
 
-	//要修改的req是否合法
-	result = global.DB.Where("q_id = ?", req.QId).First(&model.Test{})
-	if result.RowsAffected == 1 {
-		return nil, status.Errorf(codes.AlreadyExists, "对应的题目已有测试信息")
-	}
-
 	test.QID = req.QId
-	test.TimeLimit = req.TimeLimit
-	test.MemLimit = req.MemLimit
 	test.Input = req.Input
 	test.Output = req.Output
 	result = global.DB.Updates(&test)
