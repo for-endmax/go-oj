@@ -26,9 +26,7 @@ func InitRouter() {
 		recordGroup.GET("/list", handler.GetRecordListByUID)
 		recordGroup.GET("/info", handler.GetRecordByID)
 		recordGroup.POST("/submit", handler.Submit)
-
-		// 接受状态改变通知
-		recordGroup.GET("/done", handler.Done)
+		recordGroup.GET("/retry", handler.Retry)
 	}
 
 }

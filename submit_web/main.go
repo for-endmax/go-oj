@@ -12,6 +12,8 @@ func main() {
 	initialize.InitConfig()       // 初始化配置
 	initialize.GetPort()          // 获取端口
 	initialize.InitTrans("zh")    //初始化validator翻译
+	initialize.InitRedis()        // 初始化redis客户端
+	initialize.InitRabbitMQ()     // 初始化rabbitMQ连接
 	initialize.InitConsulClient() // 初始化consul客户端
 	initialize.GetGrpcClient()    // 获取record_srv的grpc客户端
 	initialize.InitRouter()       // 初始化路由

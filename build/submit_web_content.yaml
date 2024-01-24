@@ -4,5 +4,13 @@ check_host: '172.17.0.1'
 tags:
   - 'go-oj'
   - 'web'
+redis:
+  host: '127.0.0.1'
+  port: 63791
+rabbitmq:
+  user: 'guest'
+  password: 'guest'
+  host: '127.0.0.1'
+  port: 5672
 record_srv:
   name: 'go-oj/record_srv'

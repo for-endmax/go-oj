@@ -14,10 +14,10 @@ import (
 	"time"
 	"user_web/form"
 	"user_web/global"
-	"user_web/global/response"
 	"user_web/mid"
 	"user_web/model"
 	"user_web/proto"
+	"user_web/response"
 )
 
 func HandleGrpcErrorToHttp(err error, c *gin.Context) {

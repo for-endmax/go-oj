@@ -2,8 +2,13 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/go-redis/redis/v8"
+	"github.com/hashicorp/go-uuid"
+	"github.com/streadway/amqp"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -15,6 +20,7 @@ import (
 	"submit_web/model"
 	"submit_web/proto"
 	"submit_web/response"
+	"time"
 )
 
 // HandleGrpcErrorToHttp 错误处理
@@ -160,7 +166,7 @@ func GetRecordListByUID(c *gin.Context) {
 	c.JSON(http.StatusOK, rsp)
 }
 
-// GetRecordByID 获取指定id的record的信息
+// GetRecordByID 获取指定id的record的信息(长连接读取最新状态)
 func GetRecordByID(c *gin.Context) {
 	//获取参数
 	id, err := strconv.Atoi(c.Query("id"))
@@ -168,15 +174,12 @@ func GetRecordByID(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, "参数错误")
 		return
 	}
-	// 调用rpc
+	// 首先查询一次，判断是否要等待
 	recordInfo, err := global.RecordSrvClient.GetRecordByID(context.Background(), &proto.IDRequest{Id: int32(id)})
 	if err != nil {
 		HandleGrpcErrorToHttp(err, c)
 		return
 	}
-	//TODO
-	// 长连接
-
 	rsp := response.RecordInfoResponse{
 		ID:         recordInfo.ID,
 		UID:        recordInfo.UID,
@@ -189,7 +192,68 @@ func GetRecordByID(c *gin.Context) {
 		MemLimit:   recordInfo.MemLimit,
 		SubmitCode: recordInfo.SubmitCode,
 	}
-	c.JSON(http.StatusOK, rsp)
+	if recordInfo.Status != 0 {
+		// 返回状态
+		c.JSON(http.StatusOK, rsp)
+		return
+	}
+	// 仍在判题,等待
+	zap.S().Info("查询到判题未结束,等待状态更新")
+	done := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	// 每2s读取一次redis，若有值说明状态更新了，超时时间为60s
+	go func(ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.Tick(time.Second * 2): //每两秒读取一次
+				zap.S().Info("读取redis中的值")
+				_, err := global.Redis.Get(context.Background(), strconv.Itoa(id)).Result()
+				if err != nil {
+					if !errors.Is(err, redis.Nil) {
+						zap.S().Info("读取redis中的记录id失败")
+					}
+					zap.S().Info("状态未更新")
+					continue
+				}
+				//如果有，说明状态更新
+				close(done)
+				zap.S().Info("读取到最新状态")
+				return
+			}
+		}
+	}(ctx)
+
+	select {
+	case <-time.After(time.Second * 1):
+		//超时
+		cancel()
+		zap.S().Info("超时,协程退出")
+		c.JSON(http.StatusNotModified, gin.H{})
+		return
+	case <-done:
+		cancel()
+		// 返回最新状态
+		recordInfo, err = global.RecordSrvClient.GetRecordByID(context.Background(), &proto.IDRequest{Id: int32(id)})
+		if err != nil {
+			HandleGrpcErrorToHttp(err, c)
+			return
+		}
+		rsp = response.RecordInfoResponse{
+			ID:         recordInfo.ID,
+			UID:        recordInfo.UID,
+			QID:        recordInfo.QID,
+			Lang:       recordInfo.Lang,
+			Status:     recordInfo.Status,
+			ErrCode:    recordInfo.ErrCode,
+			ErrMsg:     recordInfo.ErrMsg,
+			TimeLimit:  recordInfo.TimeLimit,
+			MemLimit:   recordInfo.MemLimit,
+			SubmitCode: recordInfo.SubmitCode,
+		}
+		c.JSON(http.StatusOK, rsp)
+	}
 }
 
 // Submit 提交代码
@@ -215,8 +279,6 @@ func Submit(c *gin.Context) {
 	}
 	//提交
 	////////////////////////////////////////////
-	//TODO
-	// 分布式事务
 
 	// 调用rpc,生成record
 	record, err := global.RecordSrvClient.CreateRecord(context.Background(), &proto.CreateRecordRequest{
@@ -230,19 +292,188 @@ func Submit(c *gin.Context) {
 		return
 	}
 
-	//TODO
-	// 将recordID放到mq中
+	// 将 record信息 放到mq中并启动协程监听回调
 	zap.S().Infof("将record放到mq, id : %d", record.ID)
 
+	recordMsg := global.MsgSend{
+		ID:         record.ID,
+		Lang:       record.Lang,
+		SubmitCode: record.SubmitCode,
+	}
+
+	err = Send2MQ(recordMsg)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"msg":       "内部错误",
+			"record_id": record.ID,
+		})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"msg":       "创建成功",
 		"record_id": record.ID,
 	})
 }
 
-// Done 接受状态改变通知
-func Done(c *gin.Context) {
-	zap.S().Info("判题结束,状态改变")
-	//TODO
-	// 接受judge_srv的请求，然后更新状态，使GetRecordByID返回结果
+// Send2MQ 发送消息并监听回调
+func Send2MQ(recordMsg global.MsgSend) error {
+	msgID, err := uuid.GenerateUUID()
+	if err != nil {
+		return err
+	}
+
+	msg, err := json.Marshal(recordMsg)
+	if err != nil {
+		return err
+	}
+	//创建回调队列,每次调用方法会生成一个
+	replyQueue, err := global.RabbitMQChan.QueueDeclare(
+		"",    // name
+		false, // durable
+		false, // delete when unused
+		true,  // exclusive
+		false, // noWait
+		nil,   // arguments
+	)
+
+	//创建消费者
+	msgs, err := global.RabbitMQChan.Consume(
+		replyQueue.Name, // queue
+		"",              // consumer
+		false,           // auto-ack
+		false,           // exclusive
+		false,           // no-local
+		false,           // no-wait
+		nil,             // args
+	)
+
+	zap.S().Info("发送信息 ", string(msg))
+	//发送信息
+	err = global.RabbitMQChan.Publish(
+		"",                // exchange
+		global.JudgeQueue, // routing key
+		false,             // mandatory
+		false,             // immediate
+		amqp.Publishing{
+			ContentType:   "text/plain",
+			CorrelationId: msgID,
+			ReplyTo:       replyQueue.Name,
+			Body:          msg,
+		})
+	if err != nil {
+		return err
+	}
+
+	//监听回调
+	go func() {
+		timer := time.After(time.Second * 60)
+		for {
+			select {
+			case <-timer:
+				//调用超时，更新record状态为-1
+				zap.S().Info("调用超时,内部错误,更新record状态为-1")
+				_, err := global.RecordSrvClient.UpdateRecord(context.Background(), &proto.UpdateRecordRequest{
+					ID:     recordMsg.ID,
+					Status: -1,
+				})
+				if err != nil {
+					zap.S().Info("更新record状态为-1出错")
+					return
+				}
+				return
+			case d, ok := <-msgs:
+				if !ok {
+					zap.S().Info("通道关闭")
+					return
+				}
+
+				if d.CorrelationId == msgID {
+					zap.S().Info("接收到回调,判题已完成,向redis写入当前recordID，向数据库写入redis更新信息")
+					// 解析回调信息
+					var msgReply global.MsgReply
+					err := json.Unmarshal(d.Body, &msgReply)
+					if err != nil {
+						zap.S().Info("解析回调信息出错")
+						continue
+					}
+					// 更新record信息
+					_, err = global.RecordSrvClient.UpdateRecord(context.Background(), &proto.UpdateRecordRequest{
+						ID:      msgReply.ID,
+						Status:  msgReply.Status,
+						ErrCode: msgReply.ErrCode,
+						ErrMsg:  msgReply.ErrMsg,
+					})
+					if err != nil {
+						zap.S().Infof("record信息更新失败  %s", err.Error())
+						return
+					}
+					// 向redis写值，通知信息更新
+					_, err = global.Redis.Set(context.Background(), strconv.Itoa(int(msgReply.ID)), 1, time.Second*60).Result()
+					if err != nil {
+						return
+					}
+					_ = d.Ack(false)
+					return
+				}
+			}
+		}
+	}()
+	return nil
+}
+
+// Retry 重试（提交后记录创建成功但是未判题，status=-1）
+func Retry(c *gin.Context) {
+	// 解析id
+	id, err := strconv.Atoi(c.Query("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, "参数错误")
+		return
+	}
+
+	// 检查记录是否存在
+	record, err := global.RecordSrvClient.GetRecordByID(context.Background(), &proto.IDRequest{Id: int32(id)})
+	if err != nil {
+		HandleGrpcErrorToHttp(err, c)
+		return
+	}
+
+	//记录的uid必须和当前用户的uid相等
+	// 验证身份,只能以自己的uid来提交
+	claims, exist := c.Get("claims")
+	if !exist {
+		c.JSON(http.StatusForbidden, gin.H{
+			"msg": "没有权限",
+		})
+		return
+	}
+	customClaims := claims.(*model.CustomClaims)
+	if int32(customClaims.ID) != record.UID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"msg": "没有权限",
+		})
+		return
+	}
+
+	// 记录状态只能是-1（超时）
+	if record.Status != -1 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"msg": "该记录无需重试",
+		})
+		return
+	}
+
+	// 重新将该recordID放进mq中
+	recordMsg := global.MsgSend{
+		ID:         record.ID,
+		Lang:       record.Lang,
+		SubmitCode: record.SubmitCode,
+	}
+	err = Send2MQ(recordMsg)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, "内部错误")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"msg": "重新尝试提交该记录",
+	})
 }
