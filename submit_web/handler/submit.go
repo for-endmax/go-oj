@@ -159,6 +159,8 @@ func GetRecordListByUID(c *gin.Context) {
 			TimeLimit:  v.TimeLimit,
 			MemLimit:   v.MemLimit,
 			SubmitCode: v.SubmitCode,
+			MemUsage:   v.MemUsage,
+			TimeUsage:  v.TimeUsage,
 		}
 		rsp.Data = append(rsp.Data, record)
 	}
@@ -191,6 +193,8 @@ func GetRecordByID(c *gin.Context) {
 		TimeLimit:  recordInfo.TimeLimit,
 		MemLimit:   recordInfo.MemLimit,
 		SubmitCode: recordInfo.SubmitCode,
+		MemUsage:   recordInfo.MemUsage,
+		TimeUsage:  recordInfo.TimeUsage,
 	}
 	if recordInfo.Status != 0 {
 		// 返回状态
@@ -212,7 +216,7 @@ func GetRecordByID(c *gin.Context) {
 				_, err := global.Redis.Get(context.Background(), strconv.Itoa(id)).Result()
 				if err != nil {
 					if !errors.Is(err, redis.Nil) {
-						zap.S().Info("读取redis中的记录id失败")
+						zap.S().Infof("读取redis中的记录id: %s失败", strconv.Itoa(id))
 					}
 					zap.S().Info("状态未更新")
 					continue
@@ -226,7 +230,7 @@ func GetRecordByID(c *gin.Context) {
 	}(ctx)
 
 	select {
-	case <-time.After(time.Second * 1):
+	case <-time.After(time.Second * 60):
 		//超时
 		cancel()
 		zap.S().Info("超时,协程退出")
@@ -251,6 +255,8 @@ func GetRecordByID(c *gin.Context) {
 			TimeLimit:  recordInfo.TimeLimit,
 			MemLimit:   recordInfo.MemLimit,
 			SubmitCode: recordInfo.SubmitCode,
+			TimeUsage:  recordInfo.TimeUsage,
+			MemUsage:   recordInfo.MemUsage,
 		}
 		c.JSON(http.StatusOK, rsp)
 	}
@@ -398,10 +404,12 @@ func Send2MQ(recordMsg global.MsgSend) error {
 					}
 					// 更新record信息
 					_, err = global.RecordSrvClient.UpdateRecord(context.Background(), &proto.UpdateRecordRequest{
-						ID:      msgReply.ID,
-						Status:  msgReply.Status,
-						ErrCode: msgReply.ErrCode,
-						ErrMsg:  msgReply.ErrMsg,
+						ID:        msgReply.ID,
+						Status:    msgReply.Status,
+						ErrCode:   msgReply.ErrCode,
+						ErrMsg:    msgReply.ErrMsg,
+						MemUsage:  msgReply.MemUsage,
+						TimeUsage: msgReply.TimeUsage,
 					})
 					if err != nil {
 						zap.S().Infof("record信息更新失败  %s", err.Error())

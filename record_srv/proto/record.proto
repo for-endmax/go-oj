@@ -14,12 +14,9 @@ message CreateRecordRequest{
   int32 uID=1;
   int32 qID=2;
   string lang=3;
-  int32 status=4;
-  int32 err_code=5;
-  string err_msg=6;
-  int32 time_limit=7;
-  int32 mem_limit=8;
-  string submit_code=9;
+  int32 time_limit=4;
+  int32 mem_limit=5;
+  string submit_code=6;
 }
 
 message RecordInfo{
@@ -33,6 +30,8 @@ message RecordInfo{
   int32 mem_limit=8;
   int32 ID=9;
   string submit_code=10;
+  int32 mem_usage=11;
+  int32 time_usage=12;
 }
 
 message RecordInfoList{
@@ -55,4 +54,6 @@ message UpdateRecordRequest{
   int32 status=2;
   int32 err_code=3;
   string err_msg=4;
+  int32 mem_usage=5;
+  int32 time_usage=6;
 }

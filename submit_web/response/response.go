@@ -1,6 +1,6 @@
 package response
 
-// RecordInfo 记录信息
+// RecordInfoResponse 记录信息
 type RecordInfoResponse struct {
 	ID         int32  `json:"id"`
 	UID        int32  `json:"u_id"`
@@ -12,9 +12,11 @@ type RecordInfoResponse struct {
 	TimeLimit  int32  `json:"time_limit"`
 	MemLimit   int32  `json:"mem_limit"`
 	SubmitCode string `json:"submit_code"`
+	MemUsage   int32  `json:"mem_usage"`
+	TimeUsage  int32  `json:"time_usage"`
 }
 
-// RecordInfoList 用户的所有记录
+// RecordInfoListResponse 用户的所有记录
 type RecordInfoListResponse struct {
 	Total int32                `json:"total"`
 	Data  []RecordInfoResponse `json:"data"`

@@ -25,4 +25,7 @@ type RecordModel struct {
 	TimeLimit  int32  `gorm:"column:time_limit"`
 	MemLimit   int32  `gorm:"column:mem_limit"`
 	SubmitCode string `gorm:"column:submit_code"`
+	// 新增
+	TimeUsage int32 `gorm:"column:time_usage"`
+	MemUsage  int32 `gorm:"column:mem_usage"`
 }

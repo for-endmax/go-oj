@@ -21,7 +21,7 @@ func main(){
 }`
 	// 插入数据
 	for i := 0; i < 10; i++ {
-		question := model.RecordModel{
+		record := model.RecordModel{
 			UID:        int32(i),
 			QID:        int32(i),
 			Lang:       "go",
@@ -31,8 +31,10 @@ func main(){
 			TimeLimit:  1000,
 			MemLimit:   1000,
 			SubmitCode: code,
+			MemUsage:   0,
+			TimeUsage:  0,
 		}
-		global.DB.Create(&question)
+		global.DB.Create(&record)
 
 	}
 }

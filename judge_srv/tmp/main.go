@@ -23,10 +23,12 @@ type MsgSend struct {
 
 // MsgReply 接收的mq回调消息
 type MsgReply struct {
-	ID      int32  `json:"id"`
-	Status  int32  `json:"status,omitempty"`
-	ErrCode int32  `json:"err_code,omitempty"`
-	ErrMsg  string `json:"err_msg,omitempty"`
+	ID        int32  `json:"id"`
+	Status    int32  `json:"status,omitempty"`
+	ErrCode   int32  `json:"err_code,omitempty"`
+	ErrMsg    string `json:"err_msg,omitempty"`
+	TimeUsage int32  `json:"time_usage"`
+	MemUsage  int32  `json:"mem_usage"`
 }
 
 func main() {
@@ -79,13 +81,15 @@ func main() {
 			}
 			fmt.Printf("读取消息msg:%s\n", string(d.Body))
 			// 模拟耗时操作
-			time.Sleep(time.Second * 1)
+			time.Sleep(time.Second * 10)
 
 			msgReply := MsgReply{
-				ID:      msgSend.ID,
-				Status:  1,
-				ErrCode: 0,
-				ErrMsg:  "",
+				ID:        msgSend.ID,
+				Status:    1,
+				ErrCode:   0,
+				ErrMsg:    "no err",
+				MemUsage:  100,
+				TimeUsage: 10,
 			}
 			msg, err := json.Marshal(&msgReply)
 			if err != nil {

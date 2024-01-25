@@ -38,9 +38,6 @@ func (s *RecordServer) CreateRecord(ctx context.Context, req *proto.CreateRecord
 		UID:        req.UID,
 		QID:        req.QID,
 		Lang:       req.Lang,
-		Status:     req.Status,
-		ErrCode:    req.ErrCode,
-		ErrMsg:     "",
 		TimeLimit:  1000,
 		MemLimit:   3000,
 		SubmitCode: req.SubmitCode,
@@ -54,9 +51,6 @@ func (s *RecordServer) CreateRecord(ctx context.Context, req *proto.CreateRecord
 		UID:       record.UID,
 		QID:       record.QID,
 		Lang:      record.Lang,
-		Status:    record.Status,
-		ErrCode:   record.ErrCode,
-		ErrMsg:    record.ErrMsg,
 		TimeLimit: record.TimeLimit,
 		MemLimit:  record.MemLimit,
 		ID:        record.ID,
@@ -85,6 +79,8 @@ func (s *RecordServer) GetAllRecordByUID(ctx context.Context, req *proto.UIDRequ
 			MemLimit:   v.MemLimit,
 			ID:         v.ID,
 			SubmitCode: v.SubmitCode,
+			TimeUsage:  v.TimeUsage,
+			MemUsage:   v.MemUsage,
 		}
 		rsp.Data = append(rsp.Data, &recordInfo)
 	}
@@ -109,6 +105,8 @@ func (s *RecordServer) GetRecordByID(ctx context.Context, req *proto.IDRequest) 
 		MemLimit:   record.MemLimit,
 		ID:         record.ID,
 		SubmitCode: record.SubmitCode,
+		TimeUsage:  record.TimeUsage,
+		MemUsage:   record.MemUsage,
 	}, nil
 }
 
@@ -121,6 +119,8 @@ func (s *RecordServer) UpdateRecord(ctx context.Context, req *proto.UpdateRecord
 	record.Status = req.Status
 	record.ErrCode = req.ErrCode
 	record.ErrMsg = req.ErrMsg
+	record.MemUsage = req.MemUsage
+	record.TimeUsage = req.TimeUsage
 	if result := global.DB.Save(&record); result.RowsAffected == 0 {
 		return nil, status.Errorf(codes.Internal, "更新记录出错")
 	}
@@ -135,5 +135,7 @@ func (s *RecordServer) UpdateRecord(ctx context.Context, req *proto.UpdateRecord
 		MemLimit:   record.MemLimit,
 		ID:         record.ID,
 		SubmitCode: record.SubmitCode,
+		MemUsage:   record.MemUsage,
+		TimeUsage:  record.TimeUsage,
 	}, nil
 }
