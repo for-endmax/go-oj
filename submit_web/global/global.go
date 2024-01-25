@@ -29,6 +29,9 @@ type MsgSend struct {
 	ID         int32  `json:"id"`
 	Lang       string `json:"lang,omitempty"`
 	SubmitCode string `json:"submit_code,omitempty"`
+	//新增
+	TimeLimit int32 `json:"time_limit"`
+	MemLimit  int32 `json:"mem_limit"`
 }
 
 // MsgReply 接收的mq回调消息

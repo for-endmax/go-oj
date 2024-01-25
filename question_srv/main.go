@@ -11,6 +11,7 @@ func main() {
 	initialize.InitLogger()       // 初始化日志
 	initialize.InitConfig()       // 读取配置信息
 	initialize.InitDB()           // 初始化MySQL
+	initialize.GetHost()          //获取ip地址
 	initialize.GetPort()          // 获取端口
 	initialize.InitConsulClient() // 初始化consul客户端
 	initialize.Register()         // 服务注册

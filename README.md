@@ -29,8 +29,8 @@
 ###
 ## 预想架构
 
-![架构图](pics/img.png)
+![架构图](img.png)
 
 
 ## 快速启动demo
-[快速启动](build/introduction.md)
+[快速启动](introduction.md)

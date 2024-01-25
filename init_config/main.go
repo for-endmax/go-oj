@@ -52,4 +52,5 @@ func main() {
 	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/question_web", "./build/question_web_content.yaml")
 	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/record_srv", "./build/record_srv_content.yaml")
 	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/submit_web", "./build/submit_web_content.yaml")
+	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/judge_srv", "./build/judge_srv_content.yaml")
 }

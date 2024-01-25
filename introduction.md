@@ -17,14 +17,21 @@ docker run \
 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
 ```
 
-### consul安装：
+### Consul安装：
 ```shell
 docker run -d -p 8500:8500 -p 8300:8300 -p 8301:8301 -p 8302:8302 -p 8600:8600/udp consul consul agent -dev -client=0.0.0.0
 ```
 
-### redis安装：
+### Redis 安装：
 ```shell
 docker run -p 6379:6379 -d redis:latest redis-server
+```
+
+### RabbitMQ 安装
+```shell
+docker run -d --hostname my-rabbit --name rabbit -p 15672:15672 -p 5672:5672 rabbitmq
+docker exec -it 容器id /bin/bash
+rabbitmq-plugins enable rabbitmq_management
 ```
 
 ## 2.在MySQL中创建数据库

@@ -305,6 +305,8 @@ func Submit(c *gin.Context) {
 		ID:         record.ID,
 		Lang:       record.Lang,
 		SubmitCode: record.SubmitCode,
+		MemLimit:   record.MemLimit,
+		TimeLimit:  record.TimeLimit,
 	}
 
 	err = Send2MQ(recordMsg)
@@ -475,6 +477,8 @@ func Retry(c *gin.Context) {
 		ID:         record.ID,
 		Lang:       record.Lang,
 		SubmitCode: record.SubmitCode,
+		MemLimit:   record.MemLimit,
+		TimeLimit:  record.TimeLimit,
 	}
 	err = Send2MQ(recordMsg)
 	if err != nil {
