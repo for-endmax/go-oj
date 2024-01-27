@@ -46,11 +46,11 @@ func writeConfig2Consul(url string, data string) {
 
 func main() {
 	// 向consul写入各个服务的具体配置
-	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/user_srv", "./build/user_srv_content.yaml")
-	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/user_web", "./build/user_web_content.yaml")
-	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/question_srv", "./build/question_srv_content.yaml")
-	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/question_web", "./build/question_web_content.yaml")
-	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/record_srv", "./build/record_srv_content.yaml")
-	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/submit_web", "./build/submit_web_content.yaml")
-	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/judge_srv", "./build/judge_srv_content.yaml")
+	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/user_srv", "./user_srv_content.yaml")
+	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/user_web", "./user_web_content.yaml")
+	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/question_srv", "./question_srv_content.yaml")
+	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/question_web", "./question_web_content.yaml")
+	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/record_srv", "./record_srv_content.yaml")
+	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/submit_web", "./submit_web_content.yaml")
+	writeConfig2Consul("http://127.0.0.1:8500/v1/kv/go-oj/judge_srv", "./judge_srv_content.yaml")
 }

@@ -32,6 +32,7 @@ type MsgSend struct {
 	//新增
 	TimeLimit int32 `json:"time_limit"`
 	MemLimit  int32 `json:"mem_limit"`
+	QID       int32 `json:"q_id"`
 }
 
 // MsgReply 接收的mq回调消息

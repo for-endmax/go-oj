@@ -1,13 +1,14 @@
 package judge
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/streadway/amqp"
 	"go.uber.org/zap"
 	"judge_srv/global"
 	"judge_srv/message"
-	"time"
+	"judge_srv/proto"
 )
 
 type MQ struct {
@@ -84,12 +85,14 @@ func (m *MQ) Run() {
 			zap.S().Infof("读取消息msg:%s\n", string(d.Body))
 
 			// 进行判题，返回回调信息
+			global.JudgeDone = make(chan struct{})
 			msgReply, err := Judge(msgSend)
+			close(global.JudgeDone)
 			if err != nil {
 				zap.S().Info("判题失败")
 				continue
 			}
-			msg, err := json.Marshal(&msgReply)
+			msg, err := json.Marshal(msgReply)
 			if err != nil {
 				zap.S().Info("生成回调信息出错")
 				continue
@@ -116,14 +119,56 @@ func (m *MQ) Run() {
 }
 
 // Judge 判题
-func Judge(msgSend message.MsgSend) (message.MsgReply, error) {
-	time.Sleep(time.Second * 2)
-	return message.MsgReply{
-		ID:        msgSend.ID,
+func Judge(msgSend message.MsgSend) (*message.MsgReply, error) {
+	// 创建task
+	task, err := CreateTask(msgSend)
+	if err != nil {
+		return nil, err
+	}
+	defer task.Clean()
+	// 查询test信息
+	testInfos, err := global.QuestionSrvClient.GetTestInfo(context.Background(), &proto.GetTestRequest{
+		QId: task.msgSend.QID,
+	})
+	if err != nil {
+		zap.S().Infof("查询record信息出错,QID:%d", task.msgSend.QID)
+		return nil, err
+	}
+	if testInfos.Total == 0 {
+		zap.S().Info("没有测试信息")
+		return nil, fmt.Errorf("题目：%d,没有测试信息", task.msgSend.QID)
+	}
+	zap.S().Infof("查询到的测试信息total:%d", testInfos.Total)
+
+	//判题
+	var totalTimeUsage int32 = 0
+	var totalMemUsage int32 = 0
+	for i, v := range testInfos.Data {
+		err, result := task.Run(v.Input, v.Output)
+		if err != nil {
+			zap.S().Info("判题出错")
+			return nil, err
+		}
+
+		zap.S().Infof("测试用例：%d\n判题状态码：%d ,运行时间：%d ms,运行内存: %d KB, 错误信息：%s", i, result.ErrCode, result.runTime, result.runMem, result.ErrMsg)
+		totalTimeUsage += result.runTime
+		totalMemUsage += result.runMem
+		if result.ErrCode != 0 {
+			fmt.Println("判题未通过")
+			return &message.MsgReply{
+				ID:      task.msgSend.ID,
+				Status:  1,
+				ErrCode: result.ErrCode,
+				ErrMsg:  result.ErrMsg,
+			}, nil
+		}
+	}
+	return &message.MsgReply{
+		ID:        task.msgSend.ID,
 		Status:    1,
 		ErrCode:   0,
-		ErrMsg:    "no err",
-		MemUsage:  100,
-		TimeUsage: 10,
+		ErrMsg:    "",
+		TimeUsage: totalTimeUsage / testInfos.Total,
+		MemUsage:  totalMemUsage / testInfos.Total,
 	}, nil
 }

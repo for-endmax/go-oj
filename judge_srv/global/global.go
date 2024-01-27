@@ -16,3 +16,5 @@ var (
 	RabbitMQChan      *amqp.Channel        //RabbitMQ channel
 )
 var JudgeQueue string = "judge_queue"
+
+var JudgeDone chan struct{}
