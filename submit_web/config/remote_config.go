@@ -9,6 +9,7 @@ type ServerConfig struct {
 	RecordSrvInfo RecordSrvConfig `mapstructure:"record_srv"`
 	RedisInfo     RedisConfig     `mapstructure:"redis"`
 	RabbitMQInfo  RabbitMQConfig  `mapstructure:"rabbitmq"`
+	JaegerInfo    JaegerConfig    `mapstructure:"jaeger"`
 }
 
 type RecordSrvConfig struct {
@@ -16,6 +17,11 @@ type RecordSrvConfig struct {
 }
 
 type RedisConfig struct {
+	Port int    `mapstructure:"port"`
+	Host string `mapstructure:"host"`
+}
+
+type JaegerConfig struct {
 	Port int    `mapstructure:"port"`
 	Host string `mapstructure:"host"`
 }

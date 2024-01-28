@@ -4,14 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/go-redis/redis/v8"
 	"github.com/hashicorp/go-uuid"
+	"github.com/opentracing/opentracing-go"
 	"github.com/streadway/amqp"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -287,7 +290,7 @@ func Submit(c *gin.Context) {
 	////////////////////////////////////////////
 
 	// 调用rpc,生成record
-	record, err := global.RecordSrvClient.CreateRecord(context.Background(), &proto.CreateRecordRequest{
+	record, err := global.RecordSrvClient.CreateRecord(context.WithValue(context.Background(), "ginContext", c), &proto.CreateRecordRequest{
 		UID:        submitForm.UID,
 		QID:        submitForm.QID,
 		Lang:       submitForm.Lang,
@@ -309,8 +312,7 @@ func Submit(c *gin.Context) {
 		TimeLimit:  record.TimeLimit,
 		QID:        record.QID,
 	}
-
-	err = Send2MQ(recordMsg)
+	err = Send2MQ(c, recordMsg)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"msg":       "内部错误",
@@ -318,6 +320,7 @@ func Submit(c *gin.Context) {
 		})
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"msg":       "创建成功",
 		"record_id": record.ID,
@@ -325,7 +328,17 @@ func Submit(c *gin.Context) {
 }
 
 // Send2MQ 发送消息并监听回调
-func Send2MQ(recordMsg global.MsgSend) error {
+func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
+	span := c.Value("parentSpan")
+	var ok bool
+	var parentSpan opentracing.Span
+	if parentSpan, ok = span.(opentracing.Span); !ok {
+		c.JSON(http.StatusInternalServerError, "内部错误")
+		return fmt.Errorf("获取span错误")
+	}
+	sendSpan := opentracing.StartSpan("send2MQ", opentracing.ChildOf(parentSpan.Context()))
+	defer sendSpan.Finish()
+
 	msgID, err := uuid.GenerateUUID()
 	if err != nil {
 		return err
@@ -376,12 +389,20 @@ func Send2MQ(recordMsg global.MsgSend) error {
 	//监听回调
 	go func() {
 		timer := time.After(time.Second * 60)
+		v := c.Value("closer")
+		var ok bool
+		var closer io.Closer
+		if closer, ok = v.(io.Closer); !ok {
+			return
+		}
+		defer closer.Close() //回调结束关闭tracer
+
 		for {
 			select {
 			case <-timer:
 				//调用超时，更新record状态为-1
 				zap.S().Info("调用超时,内部错误,更新record状态为-1")
-				_, err := global.RecordSrvClient.UpdateRecord(context.Background(), &proto.UpdateRecordRequest{
+				_, err := global.RecordSrvClient.UpdateRecord(context.WithValue(context.Background(), "ginContext", c), &proto.UpdateRecordRequest{
 					ID:     recordMsg.ID,
 					Status: -1,
 				})
@@ -406,7 +427,7 @@ func Send2MQ(recordMsg global.MsgSend) error {
 						continue
 					}
 					// 更新record信息
-					_, err = global.RecordSrvClient.UpdateRecord(context.Background(), &proto.UpdateRecordRequest{
+					_, err = global.RecordSrvClient.UpdateRecord(context.WithValue(context.Background(), "ginContext", c), &proto.UpdateRecordRequest{
 						ID:        msgReply.ID,
 						Status:    msgReply.Status,
 						ErrCode:   msgReply.ErrCode,
@@ -419,7 +440,9 @@ func Send2MQ(recordMsg global.MsgSend) error {
 						return
 					}
 					// 向redis写值，通知信息更新
+					redisSpan := opentracing.StartSpan("updateRedis", opentracing.ChildOf(parentSpan.Context()))
 					_, err = global.Redis.Set(context.Background(), strconv.Itoa(int(msgReply.ID)), 1, time.Second*60).Result()
+					redisSpan.Finish()
 					if err != nil {
 						return
 					}
@@ -434,6 +457,13 @@ func Send2MQ(recordMsg global.MsgSend) error {
 
 // Retry 重试（提交后记录创建成功但是未判题，status=-1）
 func Retry(c *gin.Context) {
+	span := c.Value("parentSpan")
+	var ok bool
+	var parentSpan opentracing.Span
+	if parentSpan, ok = span.(opentracing.Span); !ok {
+		c.JSON(http.StatusInternalServerError, "内部错误")
+		return
+	}
 	// 解析id
 	id, err := strconv.Atoi(c.Query("id"))
 	if err != nil {
@@ -482,11 +512,13 @@ func Retry(c *gin.Context) {
 		TimeLimit:  record.TimeLimit,
 		QID:        record.QID,
 	}
-	err = Send2MQ(recordMsg)
+	sendSpan := opentracing.StartSpan("send2MQ", opentracing.ChildOf(parentSpan.Context()))
+	err = Send2MQ(c, recordMsg)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, "内部错误")
 		return
 	}
+	sendSpan.Finish()
 	c.JSON(http.StatusOK, gin.H{
 		"msg": "重新尝试提交该记录",
 	})

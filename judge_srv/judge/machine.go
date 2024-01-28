@@ -3,12 +3,12 @@ package judge
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/hashicorp/go-uuid"
+	"go.uber.org/zap"
 	"io"
 	"judge_srv/message"
 	"os"
@@ -21,29 +21,6 @@ import (
 type Output struct {
 	msg      []byte
 	exitCode int
-}
-
-// Option 各个语言的配置
-type Option struct {
-	fileName  string
-	ImageName string
-	buildCmd  string
-	RunCmd    string
-}
-
-var langMap = map[string]Option{
-	"go": {
-		fileName:  "main.go",
-		ImageName: "endmax/go:latest",
-		buildCmd:  "go mod init endmax && go build main.go",
-		RunCmd:    "time -f \"-%K:%e\" ./main",
-	},
-	"python": {
-		fileName:  "main.py",
-		ImageName: "endmax/python:latest",
-		buildCmd:  "",
-		RunCmd:    "time -f \"-%K:%e\" python3 main.py",
-	},
 }
 
 // 解析日志
@@ -91,18 +68,18 @@ func CreateTask(msgSend message.MsgSend) (task *Task, err error) {
 	task.msgSend = msgSend
 	task.option = langMap[task.msgSend.Lang]
 	if task.dockerClient, err = client.NewClientWithOpts(); err != nil {
-		fmt.Println("创建客户端失败")
+		zap.S().Info("创建客户端失败")
 		return nil, err
 	}
 
 	task.absPathDir = path.Join("/home/endmax/code", task.uuid)
 	if err := os.MkdirAll(task.absPathDir, 0755); err != nil {
-		fmt.Println("创建目录失败")
+		zap.S().Info("创建目录失败")
 		return nil, err
 	}
 
 	if err := os.WriteFile(path.Join(task.absPathDir, task.option.fileName), []byte(task.msgSend.SubmitCode), 0755); err != nil {
-		fmt.Println("创建文件失败")
+		zap.S().Info("创建文件失败")
 		return nil, err
 	}
 	//创建容器
@@ -132,14 +109,14 @@ func CreateTask(msgSend message.MsgSend) (task *Task, err error) {
 			//},
 		}, nil, nil, task.uuid) // uuid作为container的名称
 	if err != nil {
-		fmt.Println("创建容器失败")
+		zap.S().Info("创建容器失败")
 		return nil, err
 	}
 	task.containerID = createContainerResp.ID
 
 	// 启动容器
 	if err := task.dockerClient.ContainerStart(context.Background(), task.containerID, container.StartOptions{}); err != nil {
-		fmt.Println("启动容器失败")
+		zap.S().Info("启动容器失败")
 		return nil, err
 	}
 	return task, nil
@@ -147,67 +124,69 @@ func CreateTask(msgSend message.MsgSend) (task *Task, err error) {
 
 // Clean 清理
 func (t *Task) Clean() {
-	fmt.Println("\n删除容器和目录")
+	zap.S().Info("删除容器和目录")
 	// 清除
 	if err := t.dockerClient.ContainerKill(context.Background(), t.containerID, "9"); err != nil {
-		fmt.Printf("Failed to kill container: %v", err)
+		zap.S().Infof("停止容器失败: %v", err)
 	}
 
 	if err := t.dockerClient.ContainerRemove(context.Background(), t.containerID, container.RemoveOptions{
 		RemoveVolumes: true,
 		Force:         true,
 	}); err != nil {
-		fmt.Printf("Failed to remove container: %v", err)
+		zap.S().Infof("删除容器失败: %v", err)
 	}
 	err := os.RemoveAll(t.absPathDir)
 	if err != nil {
-		fmt.Printf("Failed to remove volume folder: %v", err)
+		zap.S().Infof("删除目录失败: %v", err)
 	}
 }
 
 // Run 运行判题机进行判题(一次)
-func (t *Task) Run(testInput string, testOutput string) (error, *Result) {
-
-	// 编译
-	fmt.Println("编译...")
-	buildOutput, err := t.Exec(t.option.buildCmd, "")
-	if err != nil {
-		fmt.Println("\n编译服务出错")
-		return err, nil
-	}
-	if buildOutput.exitCode != 0 {
-		fmt.Println("\n编译错误")
-		return nil, &Result{
-			ErrCode: 1,
-			ErrMsg:  string(buildOutput.msg),
+func (t *Task) Run(testInput string, testOutput string, num int) (error, *Result) {
+	if num == 0 {
+		// 编译
+		zap.S().Info("编译...")
+		buildOutput, err := t.Exec(t.option.buildCmd, "")
+		if err != nil {
+			zap.S().Info("编译服务出错")
+			return err, nil
+		}
+		if buildOutput.exitCode != 0 {
+			zap.S().Info("编译错误")
+			return nil, &Result{
+				ErrCode: 1,
+				ErrMsg:  string(buildOutput.msg),
+			}
 		}
 	}
+
 	// 执行
-	fmt.Println("\n执行...")
-	fmt.Printf("测试输入数据：\n%s测试输出数据:\n%s\n", testInput, testOutput)
+	zap.S().Info("执行...")
+	zap.S().Infof("测试输入数据：\n%s测试输出数据:\n%s", testInput, testOutput)
 	runOutput, err := t.Exec(t.option.RunCmd, testInput)
-	//fmt.Println(string(runOutput.msg))
+	//zap.S()().Info()(string(runOutput.msg))
 	if err != nil {
-		fmt.Println("\n执行服务出错")
+		zap.S().Info("执行服务出错")
 		return err, nil
 	}
 
 	if runOutput.exitCode != 0 {
 		if runOutput.exitCode == 137 {
-			fmt.Println("内存超限")
+			zap.S().Info("内存超限")
 			return nil, &Result{
 				ErrCode: 4,
 				ErrMsg:  string(runOutput.msg),
 			}
 		}
 		if runOutput.exitCode == 2001 {
-			fmt.Println("超时")
+			zap.S().Info("超时")
 			return nil, &Result{
 				ErrCode: 2,
 				ErrMsg:  string(runOutput.msg),
 			}
 		}
-		fmt.Println("\n运行时错误")
+		zap.S().Info("运行时错误")
 		return nil, &Result{
 			ErrCode: 1,
 			ErrMsg:  string(runOutput.msg),
@@ -215,38 +194,31 @@ func (t *Task) Run(testInput string, testOutput string) (error, *Result) {
 	}
 
 	//获取时间 0.00
-	runTime, runMem, realMsg := GetResource(runOutput.msg)
-	fmt.Printf("运行时间 %d ms,运行内存 %d KB", runTime, runMem)
+	runTime, runMem, realMsg, err := GetResource(runOutput.msg)
+	if err != nil {
+		return err, nil
+	}
+	zap.S().Infof("运行时间 %d ms,运行内存 %d KB", runTime, runMem)
 	// 测试用例输出比较
 	if testOutput != realMsg {
-		fmt.Println("\n测试用例不通过")
+		zap.S().Info("测试用例不通过")
 		return nil, &Result{
 			ErrCode: 3,
 			ErrMsg:  realMsg,
 		}
 	}
-	fmt.Println("\n测试用例通过")
+	zap.S().Info("测试用例通过")
 
 	result := Result{
 		runTime: runTime,
 		runMem:  runMem,
 	}
-	//判断是否超时或超内存
-	if runMem > t.msgSend.MemLimit {
-		//超内存
-		result.ErrCode = 4
-		result.ErrMsg = "超内存"
-	}
-	if runTime > t.msgSend.TimeLimit {
-		//超时
-		result.ErrCode = 2
-		result.ErrMsg = "超时"
-	}
+
 	return nil, &result
 }
 
 // GetResource 获取时间(ms),内存KB  -1000:0.00
-func GetResource(msg []byte) (time int32, mem int32, realMsg string) {
+func GetResource(msg []byte) (time int32, mem int32, realMsg string, err error) {
 	n := len(msg)
 	timeStr := ""
 	memStr := ""
@@ -266,15 +238,15 @@ func GetResource(msg []byte) (time int32, mem int32, realMsg string) {
 	// 将字符串转换为浮点数
 	f, err := strconv.ParseFloat(timeStr, 64)
 	if err != nil {
-		fmt.Println("转换失败:", err)
-		panic(err)
+		zap.S().Info("转换失败:", err)
+		return 0, 0, "", nil
 	}
 	time = int32(f * 1000)
 
 	m, err := strconv.Atoi(memStr)
 	if err != nil {
-		fmt.Println("转换失败:", err)
-		panic(err)
+		zap.S().Info("转换失败:", err)
+		return 0, 0, "", nil
 	}
 	mem = int32(m)
 	return
@@ -291,7 +263,7 @@ func reverse(a []byte) []byte {
 
 // Exec 执行指令
 func (t *Task) Exec(cmd string, testData string) (*Output, error) {
-	fmt.Printf("执行命令：%s\n", cmd)
+	zap.S().Infof("执行命令：%s", cmd)
 	if cmd == "" {
 		return &Output{}, nil
 	}
@@ -324,7 +296,7 @@ func (t *Task) Exec(cmd string, testData string) (*Output, error) {
 	if testData != "" {
 		//写数据
 		if _, err := io.WriteString(attachResp.Conn, testData); err != nil {
-			fmt.Println("写入数据失败")
+			zap.S().Info("写入数据失败")
 			return nil, err
 		}
 	}
@@ -339,7 +311,7 @@ func (t *Task) Exec(cmd string, testData string) (*Output, error) {
 	}()
 
 	select {
-	case <-time.After(time.Second * 60):
+	case <-time.After(time.Second * 20):
 		return &Output{
 			msg:      []byte("程序运行超时"),
 			exitCode: 2001,
@@ -355,7 +327,7 @@ func (t *Task) Exec(cmd string, testData string) (*Output, error) {
 		if err != nil {
 			return nil, err
 		}
-		fmt.Printf("退出状态码:%d\n", inspectResp.ExitCode)
+		zap.S().Infof("退出状态码:%d", inspectResp.ExitCode)
 		return &Output{
 			msg:      msg,
 			exitCode: inspectResp.ExitCode,

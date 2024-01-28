@@ -23,16 +23,16 @@ func main(){
 	for i := 0; i < 10; i++ {
 		record := model.RecordModel{
 			UID:        int32(i),
-			QID:        int32(i),
+			QID:        int32(1),
 			Lang:       "go",
-			Status:     0,
+			Status:     1,
 			ErrCode:    0,
-			ErrMsg:     "没有错误",
+			ErrMsg:     "",
 			TimeLimit:  1000,
 			MemLimit:   1000,
 			SubmitCode: code,
 			MemUsage:   0,
-			TimeUsage:  0,
+			TimeUsage:  100,
 		}
 		global.DB.Create(&record)
 

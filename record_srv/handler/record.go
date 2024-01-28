@@ -39,7 +39,7 @@ func (s *RecordServer) CreateRecord(ctx context.Context, req *proto.CreateRecord
 		QID:        req.QID,
 		Lang:       req.Lang,
 		TimeLimit:  1000,
-		MemLimit:   3000,
+		MemLimit:   30 * 1024,
 		SubmitCode: req.SubmitCode,
 	}
 	result := global.DB.Create(&record)
@@ -48,12 +48,13 @@ func (s *RecordServer) CreateRecord(ctx context.Context, req *proto.CreateRecord
 		return nil, status.Errorf(codes.Internal, "创建失败")
 	}
 	return &proto.RecordInfo{
-		UID:       record.UID,
-		QID:       record.QID,
-		Lang:      record.Lang,
-		TimeLimit: record.TimeLimit,
-		MemLimit:  record.MemLimit,
-		ID:        record.ID,
+		UID:        record.UID,
+		QID:        record.QID,
+		Lang:       record.Lang,
+		TimeLimit:  record.TimeLimit,
+		MemLimit:   record.MemLimit,
+		ID:         record.ID,
+		SubmitCode: record.SubmitCode,
 	}, nil
 }
 

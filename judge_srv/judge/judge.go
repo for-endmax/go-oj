@@ -2,6 +2,7 @@ package judge
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/streadway/amqp"
@@ -64,6 +65,9 @@ func (m *MQ) InitMQ() {
 	if err != nil {
 		panic(err)
 	}
+
+	global.JudgeDone = make(chan struct{})
+	close(global.JudgeDone)
 }
 
 // Close 关闭连接
@@ -82,44 +86,76 @@ func (m *MQ) Run() {
 				zap.S().Info("从mq中解析信息出错")
 				continue
 			}
-			zap.S().Infof("读取消息msg:%s\n", string(d.Body))
+			zap.S().Infof("读取消息msg:%s", string(d.Body))
 
-			// 进行判题，返回回调信息
+			//base64解码
+			realCode := make([]byte, base64.StdEncoding.DecodedLen(len(msgSend.SubmitCode)))
+			_, err = base64.StdEncoding.Decode(realCode, []byte(msgSend.SubmitCode))
+			if err != nil {
+				zap.S().Info("代码解码错误")
+				//返回回调信息
+				err = m.Reply(d, &message.MsgReply{
+					ID:        msgSend.ID,
+					Status:    1,
+					ErrCode:   1,
+					ErrMsg:    "代码编码错误",
+					TimeUsage: 0,
+					MemUsage:  0,
+				})
+				if err != nil {
+					continue
+				}
+				continue
+			}
+			msgSend.SubmitCode = string(realCode)
+			zap.S().Infof("解码后的提交代码:\n%s", msgSend.SubmitCode)
+			// 进行判题
 			global.JudgeDone = make(chan struct{})
 			msgReply, err := Judge(msgSend)
 			close(global.JudgeDone)
+
 			if err != nil {
 				zap.S().Info("判题失败")
 				continue
 			}
-			msg, err := json.Marshal(msgReply)
+			//返回回调信息
+			err = m.Reply(d, msgReply)
 			if err != nil {
-				zap.S().Info("生成回调信息出错")
 				continue
 			}
-
-			zap.S().Info("回调消息 %s", string(msg))
-			err = m.Chan.Publish(
-				"",        // exchange
-				d.ReplyTo, // routing key
-				false,     // mandatory
-				false,     // immediate
-				amqp.Publishing{
-					ContentType:   "text/plain",
-					CorrelationId: d.CorrelationId,
-					Body:          msg,
-				})
-			if err != nil {
-				zap.S().Info("返回回调信息出错")
-				continue
-			}
-			d.Ack(false)
 		}
 	}()
 }
 
+// Reply 返回信息
+func (m *MQ) Reply(d amqp.Delivery, msgReply *message.MsgReply) error {
+	msg, err := json.Marshal(msgReply)
+	if err != nil {
+		zap.S().Info("生成回调信息出错")
+		return err
+	}
+	zap.S().Info("回调消息 %s", string(msg))
+	err = m.Chan.Publish(
+		"",        // exchange
+		d.ReplyTo, // routing key
+		false,     // mandatory
+		false,     // immediate
+		amqp.Publishing{
+			ContentType:   "text/plain",
+			CorrelationId: d.CorrelationId,
+			Body:          msg,
+		})
+	if err != nil {
+		zap.S().Info("返回回调信息出错")
+		return err
+	}
+	d.Ack(false)
+	return nil
+}
+
 // Judge 判题
 func Judge(msgSend message.MsgSend) (*message.MsgReply, error) {
+
 	// 创建task
 	task, err := CreateTask(msgSend)
 	if err != nil {
@@ -144,17 +180,17 @@ func Judge(msgSend message.MsgSend) (*message.MsgReply, error) {
 	var totalTimeUsage int32 = 0
 	var totalMemUsage int32 = 0
 	for i, v := range testInfos.Data {
-		err, result := task.Run(v.Input, v.Output)
+		err, result := task.Run(v.Input, v.Output, i)
 		if err != nil {
 			zap.S().Info("判题出错")
 			return nil, err
 		}
 
-		zap.S().Infof("测试用例：%d\n判题状态码：%d ,运行时间：%d ms,运行内存: %d KB, 错误信息：%s", i, result.ErrCode, result.runTime, result.runMem, result.ErrMsg)
+		zap.S().Infof("测试用例：%d ,判题状态码：%d ,运行时间：%d ms,运行内存: %d KB, 错误信息：%s", i, result.ErrCode, result.runTime, result.runMem, result.ErrMsg)
 		totalTimeUsage += result.runTime
 		totalMemUsage += result.runMem
 		if result.ErrCode != 0 {
-			fmt.Println("判题未通过")
+			zap.S().Info("判题未通过")
 			return &message.MsgReply{
 				ID:      task.msgSend.ID,
 				Status:  1,
@@ -163,12 +199,37 @@ func Judge(msgSend message.MsgSend) (*message.MsgReply, error) {
 			}, nil
 		}
 	}
+	avgMemUsage, avgTimeUsage := totalMemUsage/testInfos.Total, totalTimeUsage/testInfos.Total
+	//判断是否超时或超内存
+	if avgMemUsage > task.msgSend.MemLimit {
+		//超内存
+		return &message.MsgReply{
+			ID:        task.msgSend.ID,
+			Status:    1,
+			ErrCode:   4,
+			ErrMsg:    "超内存",
+			TimeUsage: avgTimeUsage,
+			MemUsage:  avgTimeUsage,
+		}, nil
+	}
+	if avgTimeUsage > task.msgSend.TimeLimit {
+		//超时
+		return &message.MsgReply{
+			ID:        task.msgSend.ID,
+			Status:    1,
+			ErrCode:   2,
+			ErrMsg:    "超时",
+			TimeUsage: avgTimeUsage,
+			MemUsage:  avgTimeUsage,
+		}, nil
+	}
+
 	return &message.MsgReply{
 		ID:        task.msgSend.ID,
 		Status:    1,
 		ErrCode:   0,
 		ErrMsg:    "",
-		TimeUsage: totalTimeUsage / testInfos.Total,
-		MemUsage:  totalMemUsage / testInfos.Total,
+		TimeUsage: avgTimeUsage,
+		MemUsage:  avgMemUsage,
 	}, nil
 }

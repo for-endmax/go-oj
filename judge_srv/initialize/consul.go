@@ -50,7 +50,7 @@ func Register() {
 	zap.S().Info("服务注册成功")
 
 	go func() {
-		r := gin.Default()
+		r := gin.New()
 		r.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"message": "health",

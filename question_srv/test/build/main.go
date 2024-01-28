@@ -1,12 +1,9 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"question_srv/global"
 	"question_srv/initialize"
 	"question_srv/model"
-	"strconv"
 )
 
 // insertData 建表并插入数据
@@ -22,37 +19,31 @@ func insertData() {
 		panic(err)
 	}
 	// 插入数据
-	for i := 0; i < 10; i++ {
-		question := model.Question{
-			Seq:     int32(i),
-			Name:    "题目：" + strconv.Itoa(i),
-			Content: "这是一道题目",
-		}
-		global.DB.Create(&question)
-
-		myArray := []interface{}{1, 2, 3, 4, 5}
-
-		// 将数组转换为 JSON 字符串
-		jsonString, err := json.Marshal(myArray)
-		if err != nil {
-			fmt.Println("转换为 JSON 字符串时发生错误:", err)
-			return
-		}
-
-		test := model.Test{
-			QID:    int32(i),
-			Input:  string(jsonString),
-			Output: string(jsonString),
-		}
-
-		global.DB.Create(&test)
-		test = model.Test{
-			QID:    int32(i),
-			Input:  string(jsonString) + "123",
-			Output: string(jsonString) + "123",
-		}
-		global.DB.Create(&test)
+	question := model.Question{
+		Seq:     int32(1),
+		Name:    "题目：" + "初始测试题目",
+		Content: "将输入的每行字符串拼接起来,输入的最后一行为exit",
 	}
+	global.DB.Create(&question)
+
+	testInput := "aa\nbb\ncc\nexit\n"
+	testOutput := "aabbcc"
+	test := model.Test{
+		QID:    int32(1),
+		Input:  testInput,
+		Output: testOutput,
+	}
+	global.DB.Create(&test)
+
+	testInput = "aaa\nbbb\nccc\nexit\n"
+
+	testOutput = "aaabbbccc"
+	test = model.Test{
+		QID:    int32(1),
+		Input:  testInput,
+		Output: testOutput,
+	}
+	global.DB.Create(&test)
 }
 
 func main() {
