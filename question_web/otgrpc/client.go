@@ -54,7 +54,6 @@ func OpenTracingClientInterceptor(tracer opentracing.Tracer, optFuncs ...Option)
 			if parentSpan, ok := ginContext.(*gin.Context).Get("parentSpan"); ok {
 				parentCtx = parentSpan.(*jaegerClient.Span).Context()
 			}
-			//zap.S().Info("使用了拦截器")
 		}
 		/////
 		if otgrpcOpts.inclusionFunc != nil &&

@@ -5,7 +5,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/opentracing/opentracing-go"
 	"github.com/streadway/amqp"
+	"github.com/uber/jaeger-client-go"
+	jaegercfg "github.com/uber/jaeger-client-go/config"
 	"go.uber.org/zap"
 	"judge_srv/global"
 	"judge_srv/message"
@@ -80,10 +83,40 @@ func (m *MQ) Close() {
 func (m *MQ) Run() {
 	go func() {
 		for d := range m.Msgs {
+			//读取消息头
+			cfg := jaegercfg.Configuration{
+				Sampler: &jaegercfg.SamplerConfig{
+					Type:  jaeger.SamplerTypeConst,
+					Param: 1,
+				},
+				Reporter: &jaegercfg.ReporterConfig{
+					LogSpans:           true,
+					LocalAgentHostPort: fmt.Sprintf("%s:%d", global.ServerConfig.JaegerInfo.Host, global.ServerConfig.JaegerInfo.Port),
+				},
+				ServiceName: "go-oj/judge_srv",
+			}
+			tracer, closer, err := cfg.NewTracer(jaegercfg.Logger(jaeger.StdLogger))
+			if err != nil {
+				zap.S().Info("创建tracer失败")
+				closer.Close()
+				continue
+			}
+			opentracing.SetGlobalTracer(tracer)
+			headers := amqpTableCarrier{headers: d.Headers}
+			spanContext, err := tracer.Extract(opentracing.TextMap, headers)
+			if err != nil {
+				zap.S().Info("读取消息头错误")
+				closer.Close()
+				continue
+			}
+			judgeSpan := tracer.StartSpan("judge", opentracing.ChildOf(spanContext))
+
+			//读取消息体
 			var msgSend message.MsgSend
-			err := json.Unmarshal(d.Body, &msgSend)
+			err = json.Unmarshal(d.Body, &msgSend)
 			if err != nil {
 				zap.S().Info("从mq中解析信息出错")
+				closer.Close()
 				continue
 			}
 			zap.S().Infof("读取消息msg:%s", string(d.Body))
@@ -92,6 +125,7 @@ func (m *MQ) Run() {
 			realCode := make([]byte, base64.StdEncoding.DecodedLen(len(msgSend.SubmitCode)))
 			_, err = base64.StdEncoding.Decode(realCode, []byte(msgSend.SubmitCode))
 			if err != nil {
+				closer.Close()
 				zap.S().Info("代码解码错误")
 				//返回回调信息
 				err = m.Reply(d, &message.MsgReply{
@@ -109,20 +143,25 @@ func (m *MQ) Run() {
 			}
 			msgSend.SubmitCode = string(realCode)
 			zap.S().Infof("解码后的提交代码:\n%s", msgSend.SubmitCode)
+
 			// 进行判题
 			global.JudgeDone = make(chan struct{})
 			msgReply, err := Judge(msgSend)
 			close(global.JudgeDone)
-
+			judgeSpan.LogKV("recordID", msgReply.ID, "status", msgReply.Status, "errCode", msgReply.ErrCode, "errMsg", msgReply.ErrMsg)
+			judgeSpan.Finish()
 			if err != nil {
+				closer.Close()
 				zap.S().Info("判题失败")
 				continue
 			}
 			//返回回调信息
 			err = m.Reply(d, msgReply)
 			if err != nil {
+				closer.Close()
 				continue
 			}
+			closer.Close()
 		}
 	}()
 }

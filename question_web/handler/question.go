@@ -127,7 +127,7 @@ func GetQuestionList(c *gin.Context) {
 		return
 	}
 	//调用srv方法
-	rsp, err := global.QuestionSrvClient.GetQuestionList(context.Background(), &proto.PageInfoRequest{PNum: int32(pNum), PSize: int32(pSize)})
+	rsp, err := global.QuestionSrvClient.GetQuestionList(context.WithValue(context.Background(), "ginContext", c), &proto.PageInfoRequest{PNum: int32(pNum), PSize: int32(pSize)})
 	if err != nil {
 		HandleGrpcErrorToHttp(err, c)
 		return
@@ -158,7 +158,7 @@ func GetQuestionInfo(c *gin.Context) {
 		})
 	}
 	//调用srv
-	rsp, err := global.QuestionSrvClient.GetQuestionInfo(context.Background(), &proto.GetQuestionInfoRequest{Id: int32(id)})
+	rsp, err := global.QuestionSrvClient.GetQuestionInfo(context.WithValue(context.Background(), "ginContext", c), &proto.GetQuestionInfoRequest{Id: int32(id)})
 	if err != nil {
 		HandleGrpcErrorToHttp(err, c)
 		return
@@ -186,7 +186,7 @@ func AddQuestion(c *gin.Context) {
 		return
 	}
 	//调用rpc
-	rsp, err := global.QuestionSrvClient.AddQuestion(context.Background(), &proto.AddQuestionRequest{
+	rsp, err := global.QuestionSrvClient.AddQuestion(context.WithValue(context.Background(), "ginContext", c), &proto.AddQuestionRequest{
 		Seq:     addQuestionInfo.Seq,
 		Name:    addQuestionInfo.Name,
 		Content: addQuestionInfo.Content,
@@ -213,7 +213,7 @@ func DelQuestion(c *gin.Context) {
 		HandleValidatorErr(c, err)
 		return
 	}
-	_, err := global.QuestionSrvClient.DelQuestion(context.Background(), &proto.DelQuestionRequest{Id: req.ID})
+	_, err := global.QuestionSrvClient.DelQuestion(context.WithValue(context.Background(), "ginContext", c), &proto.DelQuestionRequest{Id: req.ID})
 	if err != nil {
 		HandleGrpcErrorToHttp(err, c)
 		return
@@ -235,7 +235,7 @@ func UpdateQuestion(c *gin.Context) {
 		HandleValidatorErr(c, err)
 		return
 	}
-	_, err := global.QuestionSrvClient.UpdateQuestion(context.Background(), &proto.UpdateQuestionRequest{
+	_, err := global.QuestionSrvClient.UpdateQuestion(context.WithValue(context.Background(), "ginContext", c), &proto.UpdateQuestionRequest{
 		Id:      req.ID,
 		Seq:     req.Seq,
 		Name:    req.Name,
@@ -267,7 +267,7 @@ func GetTestInfo(c *gin.Context) {
 		return
 	}
 	// 调用rpc
-	rsp, err := global.QuestionSrvClient.GetTestInfo(context.Background(), &proto.GetTestRequest{QId: int32(qID)})
+	rsp, err := global.QuestionSrvClient.GetTestInfo(context.WithValue(context.Background(), "ginContext", c), &proto.GetTestRequest{QId: int32(qID)})
 	if err != nil {
 		HandleGrpcErrorToHttp(err, c)
 		return
@@ -300,7 +300,7 @@ func AddTestInfo(c *gin.Context) {
 		return
 	}
 	// 调用rpc
-	_, err := global.QuestionSrvClient.AddTest(context.Background(), &proto.AddTestRequest{
+	_, err := global.QuestionSrvClient.AddTest(context.WithValue(context.Background(), "ginContext", c), &proto.AddTestRequest{
 		QId:    addTestForm.QID,
 		Input:  addTestForm.Input,
 		Output: addTestForm.Output,
@@ -327,7 +327,7 @@ func DelTestInfo(c *gin.Context) {
 		return
 	}
 	// 调用rpc
-	_, err := global.QuestionSrvClient.DelTest(context.Background(), &proto.DelTestRequest{Id: delTestForm.ID})
+	_, err := global.QuestionSrvClient.DelTest(context.WithValue(context.Background(), "ginContext", c), &proto.DelTestRequest{Id: delTestForm.ID})
 	if err != nil {
 		HandleGrpcErrorToHttp(err, c)
 		return
@@ -350,7 +350,7 @@ func UpdateTestInfo(c *gin.Context) {
 		return
 	}
 	// 调用rpc
-	_, err := global.QuestionSrvClient.UpdateTest(context.Background(), &proto.UpdateTestRequest{
+	_, err := global.QuestionSrvClient.UpdateTest(context.WithValue(context.Background(), "ginContext", c), &proto.UpdateTestRequest{
 		Id:     updateTestForm.ID,
 		QId:    updateTestForm.QID,
 		Input:  updateTestForm.Input,

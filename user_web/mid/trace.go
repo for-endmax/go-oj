@@ -5,7 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/uber/jaeger-client-go"
 	jaegercfg "github.com/uber/jaeger-client-go/config"
-	"submit_web/global"
+	"user_web/global"
 )
 
 // Trace 生成tracer和startSpan

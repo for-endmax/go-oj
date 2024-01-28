@@ -21,15 +21,15 @@ func InitRouter() {
 	})
 
 	// 提交记录路由
-	recordGroup := global.GinEngine.Group("/record").Use(mid.JWTAuth())
+	recordGroup := global.GinEngine.Group("/record").Use(mid.JWTAuth()).Use(mid.TraceIm())
 	{
 		recordGroup.GET("/list", handler.GetRecordListByUID)
 		recordGroup.GET("/info", handler.GetRecordByID)
-		recordGroup.GET("/retry", handler.Retry)
 	}
 	// 提交路由
 	submitGroup := global.GinEngine.Group("/record").Use(mid.JWTAuth()).Use(mid.Trace())
 	{
 		submitGroup.POST("/submit", handler.Submit)
+		submitGroup.GET("/retry", handler.Retry)
 	}
 }

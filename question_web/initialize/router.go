@@ -21,7 +21,7 @@ func InitRouter() {
 	})
 
 	// 题目路由
-	questionGroup := global.GinEngine.Group("question").Use(mid.JWTAuth())
+	questionGroup := global.GinEngine.Group("question").Use(mid.JWTAuth()).Use(mid.TraceIm())
 	{
 		questionGroup.GET("/list", handler.GetQuestionList)
 		questionGroup.POST("/add", handler.AddQuestion)
@@ -31,7 +31,7 @@ func InitRouter() {
 	}
 
 	// 测试信息路由
-	TestGroup := global.GinEngine.Group("test").Use(mid.JWTAuth())
+	TestGroup := global.GinEngine.Group("test").Use(mid.JWTAuth()).Use(mid.TraceIm())
 	{
 		TestGroup.GET("/list", handler.GetTestInfo)
 		TestGroup.POST("/add", handler.AddTestInfo)

@@ -139,7 +139,7 @@ func GetRecordListByUID(c *gin.Context) {
 	}
 
 	// 调用rpc
-	recordInfoList, err := global.RecordSrvClient.GetAllRecordByUID(context.Background(), &proto.UIDRequest{
+	recordInfoList, err := global.RecordSrvClient.GetAllRecordByUID(context.WithValue(context.Background(), "ginContext", c), &proto.UIDRequest{
 		Uid:   int32(uID),
 		PNum:  int32(pNum),
 		PSize: int32(pSize),
@@ -180,7 +180,7 @@ func GetRecordByID(c *gin.Context) {
 		return
 	}
 	// 首先查询一次，判断是否要等待
-	recordInfo, err := global.RecordSrvClient.GetRecordByID(context.Background(), &proto.IDRequest{Id: int32(id)})
+	recordInfo, err := global.RecordSrvClient.GetRecordByID(context.WithValue(context.Background(), "ginContext", c), &proto.IDRequest{Id: int32(id)})
 	if err != nil {
 		HandleGrpcErrorToHttp(err, c)
 		return
@@ -312,6 +312,7 @@ func Submit(c *gin.Context) {
 		TimeLimit:  record.TimeLimit,
 		QID:        record.QID,
 	}
+
 	err = Send2MQ(c, recordMsg)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -336,7 +337,18 @@ func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
 		c.JSON(http.StatusInternalServerError, "内部错误")
 		return fmt.Errorf("获取span错误")
 	}
-	sendSpan := opentracing.StartSpan("send2MQ", opentracing.ChildOf(parentSpan.Context()))
+	v := c.Value("closer")
+	var closer io.Closer
+	if closer, ok = v.(io.Closer); !ok {
+		return fmt.Errorf("获取closer错误")
+	}
+	v = c.Value("tracer")
+	var tracer opentracing.Tracer
+	if tracer, ok = v.(opentracing.Tracer); !ok {
+		return fmt.Errorf("获取tracer错误")
+	}
+
+	sendSpan := tracer.StartSpan("send2MQ", opentracing.ChildOf(parentSpan.Context()))
 	defer sendSpan.Finish()
 
 	msgID, err := uuid.GenerateUUID()
@@ -371,6 +383,12 @@ func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
 
 	zap.S().Info("发送信息 ", string(msg))
 	//发送信息
+	headers := amqp.Table{}
+	err = parentSpan.Tracer().Inject(parentSpan.Context(), opentracing.TextMap, amqpTableCarrier{headers})
+	if err != nil {
+		zap.S().Info("jaeger inject出错")
+		return err
+	}
 	err = global.RabbitMQChan.Publish(
 		"",                // exchange
 		global.JudgeQueue, // routing key
@@ -381,22 +399,16 @@ func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
 			CorrelationId: msgID,
 			ReplyTo:       replyQueue.Name,
 			Body:          msg,
+			Headers:       headers,
 		})
 	if err != nil {
 		return err
 	}
-
 	//监听回调
 	go func() {
 		timer := time.After(time.Second * 60)
-		v := c.Value("closer")
-		var ok bool
-		var closer io.Closer
-		if closer, ok = v.(io.Closer); !ok {
-			return
-		}
-		defer closer.Close() //回调结束关闭tracer
-
+		defer closer.Close()      //回调结束关闭tracer
+		defer parentSpan.Finish() // 回调结束后关闭起始的span
 		for {
 			select {
 			case <-timer:
@@ -440,8 +452,9 @@ func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
 						return
 					}
 					// 向redis写值，通知信息更新
-					redisSpan := opentracing.StartSpan("updateRedis", opentracing.ChildOf(parentSpan.Context()))
+					redisSpan := tracer.StartSpan("updateRedis", opentracing.ChildOf(parentSpan.Context()))
 					_, err = global.Redis.Set(context.Background(), strconv.Itoa(int(msgReply.ID)), 1, time.Second*60).Result()
+					redisSpan.LogKV("recordID", int(msgReply.ID), "status", msgReply.Status, "errCode", msgReply.ErrCode)
 					redisSpan.Finish()
 					if err != nil {
 						return
@@ -457,13 +470,6 @@ func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
 
 // Retry 重试（提交后记录创建成功但是未判题，status=-1）
 func Retry(c *gin.Context) {
-	span := c.Value("parentSpan")
-	var ok bool
-	var parentSpan opentracing.Span
-	if parentSpan, ok = span.(opentracing.Span); !ok {
-		c.JSON(http.StatusInternalServerError, "内部错误")
-		return
-	}
 	// 解析id
 	id, err := strconv.Atoi(c.Query("id"))
 	if err != nil {
@@ -472,7 +478,7 @@ func Retry(c *gin.Context) {
 	}
 
 	// 检查记录是否存在
-	record, err := global.RecordSrvClient.GetRecordByID(context.Background(), &proto.IDRequest{Id: int32(id)})
+	record, err := global.RecordSrvClient.GetRecordByID(context.WithValue(context.Background(), "ginContext", c), &proto.IDRequest{Id: int32(id)})
 	if err != nil {
 		HandleGrpcErrorToHttp(err, c)
 		return
@@ -512,13 +518,11 @@ func Retry(c *gin.Context) {
 		TimeLimit:  record.TimeLimit,
 		QID:        record.QID,
 	}
-	sendSpan := opentracing.StartSpan("send2MQ", opentracing.ChildOf(parentSpan.Context()))
 	err = Send2MQ(c, recordMsg)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, "内部错误")
 		return
 	}
-	sendSpan.Finish()
 	c.JSON(http.StatusOK, gin.H{
 		"msg": "重新尝试提交该记录",
 	})

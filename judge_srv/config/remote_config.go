@@ -8,8 +8,12 @@ type ServerConfig struct {
 	Tags            []string          `mapstructure:"tags"`
 	QuestionSrvInfo QuestionSrvConfig `mapstructure:"question_srv"`
 	RabbitMQInfo    RabbitMQConfig    `mapstructure:"rabbitmq"`
+	JaegerInfo      JaegerConfig      `mapstructure:"jaeger"`
 }
-
+type JaegerConfig struct {
+	Port int    `mapstructure:"port"`
+	Host string `mapstructure:"host"`
+}
 type QuestionSrvConfig struct {
 	Name string `mapstructure:"name"`
 }

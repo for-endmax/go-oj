@@ -2,9 +2,11 @@ package initialize
 
 import (
 	"fmt"
+	"github.com/opentracing/opentracing-go"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"user_web/global"
+	"user_web/otgrpc"
 	"user_web/proto"
 )
 
@@ -30,7 +32,7 @@ func GetGrpcClient() {
 	}
 	zap.S().Infof("获取 user_srv 服务：ip:%s, port:%d", userSrvHost, userSrvPort)
 	//拨号连接grpc服务
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", userSrvHost, userSrvPort), grpc.WithInsecure())
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", userSrvHost, userSrvPort), grpc.WithInsecure(), grpc.WithUnaryInterceptor(otgrpc.OpenTracingClientInterceptor(opentracing.GlobalTracer())))
 	if err != nil {
 		zap.S().Errorw("连接服务失败", err.Error())
 		return

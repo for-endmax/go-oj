@@ -21,7 +21,7 @@ func InitRouter() {
 	})
 
 	// 用户路由
-	userGroup := global.GinEngine.Group("user")
+	userGroup := global.GinEngine.Group("user").Use(mid.TraceIm())
 	{
 		userGroup.GET("/list", mid.JWTAuth(), handler.GetUserList)   //获取用户列表
 		userGroup.POST("/login", handler.Login)                      //用户登录

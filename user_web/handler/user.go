@@ -91,7 +91,7 @@ func Login(c *gin.Context) {
 		return
 	}
 	// 查询用户是否存在
-	rsp1, err := global.UserSrvClient.GetUserByNickname(context.Background(), &proto.NicknameRequest{Nickname: loginForm.NickName})
+	rsp1, err := global.UserSrvClient.GetUserByNickname(context.WithValue(context.Background(), "ginContext", c), &proto.NicknameRequest{Nickname: loginForm.NickName})
 	if err != nil {
 		if e, ok := status.FromError(err); ok {
 			switch e.Code() {
@@ -112,7 +112,7 @@ func Login(c *gin.Context) {
 		}
 	}
 	// 验证用户名和密码
-	rsp, err := global.UserSrvClient.CheckPassword(context.Background(), &proto.PasswordCheckInfo{
+	rsp, err := global.UserSrvClient.CheckPassword(context.WithValue(context.Background(), "ginContext", c), &proto.PasswordCheckInfo{
 		Nickname: loginForm.NickName,
 		Password: loginForm.Password,
 	})
@@ -198,7 +198,7 @@ func GetUserList(c *gin.Context) {
 
 	// 调用接口
 	//调用接口
-	rsp, err := global.UserSrvClient.GetUserInfoList(context.Background(), &proto.PageInfo{
+	rsp, err := global.UserSrvClient.GetUserInfoList(context.WithValue(context.Background(), "ginContext", c), &proto.PageInfo{
 		PNum:  int32(pageInt),
 		PSize: int32(sizeInt),
 	})
@@ -231,7 +231,7 @@ func SignUp(c *gin.Context) {
 		return
 	}
 	zap.S().Info(signupForm)
-	rsp, err := global.UserSrvClient.CreateUser(context.Background(), &proto.CreateUserInfo{
+	rsp, err := global.UserSrvClient.CreateUser(context.WithValue(context.Background(), "ginContext", c), &proto.CreateUserInfo{
 		Nickname: signupForm.NickName,
 		Gender:   signupForm.Gender,
 		Role:     1,
@@ -284,7 +284,7 @@ func AddUser(c *gin.Context) {
 		return
 	}
 	zap.S().Info(signupForm)
-	rsp, err := global.UserSrvClient.CreateUser(context.Background(), &proto.CreateUserInfo{
+	rsp, err := global.UserSrvClient.CreateUser(context.WithValue(context.Background(), "ginContext", c), &proto.CreateUserInfo{
 		Nickname: signupForm.NickName,
 		Gender:   signupForm.Gender,
 		Role:     1,
@@ -340,7 +340,7 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 
-	_, err := global.UserSrvClient.UpdateUser(context.Background(), &proto.UpdateUserInfo{
+	_, err := global.UserSrvClient.UpdateUser(context.WithValue(context.Background(), "ginContext", c), &proto.UpdateUserInfo{
 		Nickname: signupForm.NickName,
 		Gender:   signupForm.Gender,
 		Password: signupForm.Password,

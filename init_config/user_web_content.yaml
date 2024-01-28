@@ -1,6 +1,9 @@
 host: '0.0.0.0'
 default_port: 8081
 check_host: '172.17.0.1'
+jaeger:
+  host: '127.0.0.1'
+  port: 6831
 tags:
   - 'go-oj'
   - 'web'
