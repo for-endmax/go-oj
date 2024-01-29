@@ -104,10 +104,10 @@ func CreateTask(msgSend message.MsgSend) (task *Task, err error) {
 					Target: "/judge",
 				},
 			},
-			Resources: container.Resources{
-				NanoCPUs: 1000000000 * 0.3,  // 总共是10^9
-				Memory:   1024 * 1024 * 100, // 100MB
-			},
+			//Resources: container.Resources{
+			//	NanoCPUs: 1000000000 * 0.5,  // 总共是10^9
+			//	Memory:   1024 * 1024 * 100, // 100MB
+			//},
 		}, nil, nil, task.uuid) // uuid作为container的名称
 	if err != nil {
 		zap.S().Info("创建容器失败")
@@ -335,3 +335,6 @@ func (t *Task) Exec(cmd string, testData string) (*Output, error) {
 		}, nil
 	}
 }
+
+// docker ps -a | awk '$2 == "endmax/go:latest" {print $1}' | xargs docker rm -f
+// rm -rf code/

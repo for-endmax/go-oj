@@ -14,7 +14,7 @@ cleanup() {
     done
 
     # 等待一段时间，确保程序有足够的时间处理信号
-    sleep 1
+    sleep 8
 
     exit 0
 }
@@ -74,7 +74,7 @@ cd submit_web
 pids+=($!)
 cd ..
 
-echo "启动 3个 judge_srv..."
+echo "启动 2个 judge_srv..."
 cd judge_srv
 /usr/local/go/bin/go run main.go >/dev/null 2>&1 &
 pids+=($!)
@@ -82,9 +82,6 @@ pids+=($!)
 /usr/local/go/bin/go run main.go >/dev/null 2>&1 &
 pids+=($!)
 
-/usr/local/go/bin/go run main.go >/dev/null 2>&1 &
-pids+=($!)
-cd ..
 
 # 进入无限循环，保持脚本运行
 while true; do

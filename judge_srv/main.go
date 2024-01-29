@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -24,13 +25,14 @@ func main() {
 	mq.InitMQ()
 
 	//从队列中获取信息，判题，并返回回调信息
-	mq.Run()
+	go mq.Run()
 	//接收终止信号
 	quit := make(chan os.Signal)
 	//接收control+c
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	<-global.JudgeDone      // 确保判题生成的资源能被释放
-	initialize.UnRegister() // 服务注销
-	mq.Close()
+	//<-global.JudgeDone      // 确保判题生成的资源能被释放
+	initialize.UnRegister()        // 服务注销
+	mq.Close()                     //关闭连接和信道
+	time.Sleep(global.ExecTimeOut) //等待资源释放再退出
 }

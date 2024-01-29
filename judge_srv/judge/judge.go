@@ -49,9 +49,9 @@ func (m *MQ) InitMQ() {
 	}
 
 	err = m.Chan.Qos(
-		1,     // prefetch count
-		0,     // prefetch size
-		false, // global
+		global.Qos, // prefetch count
+		0,          // prefetch size
+		false,      // global
 	)
 	if err != nil {
 		panic(err)
@@ -70,8 +70,8 @@ func (m *MQ) InitMQ() {
 		panic(err)
 	}
 
-	global.JudgeDone = make(chan struct{})
-	close(global.JudgeDone)
+	//global.JudgeDone = make(chan struct{})
+	//close(global.JudgeDone)
 }
 
 // Close 关闭连接
@@ -82,9 +82,9 @@ func (m *MQ) Close() {
 
 // Run 解析
 func (m *MQ) Run() {
-	go func() {
-		for d := range m.Msgs {
-			//读取消息头
+	for msg := range m.Msgs {
+		d := msg
+		go func() { //读取消息头
 			cfg := jaegercfg.Configuration{
 				Sampler: &jaegercfg.SamplerConfig{
 					Type:  jaeger.SamplerTypeConst,
@@ -97,20 +97,20 @@ func (m *MQ) Run() {
 				ServiceName: "go-oj/judge_srv",
 			}
 			tracer, closer, err := cfg.NewTracer(jaegercfg.Logger(jaeger.StdLogger))
+			defer closer.Close()
 			if err != nil {
 				zap.S().Info("创建tracer失败")
-				closer.Close()
-				continue
+				return
 			}
 			opentracing.SetGlobalTracer(tracer)
 			headers := amqpTableCarrier{headers: d.Headers}
 			spanContext, err := tracer.Extract(opentracing.TextMap, headers)
 			judgeSpan := opentracing.StartSpan("judge", opentracing.ChildOf(spanContext))
+			defer judgeSpan.Finish()
 			ctx := opentracing.ContextWithSpan(context.Background(), judgeSpan)
 			if err != nil {
 				zap.S().Info("读取消息头错误")
-				closer.Close()
-				continue
+				return
 			}
 
 			//读取消息体
@@ -118,8 +118,7 @@ func (m *MQ) Run() {
 			err = json.Unmarshal(d.Body, &msgSend)
 			if err != nil {
 				zap.S().Info("从mq中解析信息出错")
-				closer.Close()
-				continue
+				return
 			}
 			zap.S().Infof("读取消息msg:%s", string(d.Body))
 
@@ -127,7 +126,6 @@ func (m *MQ) Run() {
 			realCode := make([]byte, base64.StdEncoding.DecodedLen(len(msgSend.SubmitCode)))
 			_, err = base64.StdEncoding.Decode(realCode, []byte(msgSend.SubmitCode))
 			if err != nil {
-				closer.Close()
 				zap.S().Info("代码解码错误")
 				//返回回调信息
 				err = m.Reply(ctx, d, &message.MsgReply{
@@ -139,34 +137,30 @@ func (m *MQ) Run() {
 					MemUsage:  0,
 				})
 				if err != nil {
-					continue
+					return
 				}
-				continue
+				return
 			}
 			msgSend.SubmitCode = string(realCode)
 			zap.S().Infof("解码后的提交代码:\n%s", msgSend.SubmitCode)
 
 			// 进行判题
-			global.JudgeDone = make(chan struct{})
+			//global.JudgeDone = make(chan struct{})
 			msgReply, err := Judge(ctx, msgSend)
-			close(global.JudgeDone)
+			//close(global.JudgeDone)
 
 			if err != nil {
-				closer.Close()
 				zap.S().Info("判题失败")
-				continue
+				return
 			}
 			//返回回调信息
 			err = m.Reply(ctx, d, msgReply)
 			if err != nil {
-				closer.Close()
-				continue
+				return
 			}
 			judgeSpan.LogKV("recordID", msgReply.ID, "status", msgReply.Status, "errCode", msgReply.ErrCode, "errMsg", msgReply.ErrMsg)
-			judgeSpan.Finish()
-			closer.Close()
-		}
-	}()
+		}()
+	}
 }
 
 // Reply 返回信息
