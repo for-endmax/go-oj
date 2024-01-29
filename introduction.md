@@ -34,29 +34,18 @@ docker exec -it 容器id /bin/bash
 rabbitmq-plugins enable rabbitmq_management
 ```
 
-## 2.在MySQL中创建数据库
-
-以交互方式进入容器，启动shell
+### Jaeger安装
 ```shell
-docker exec -it mysql-5.7-1 /bin/bash
-```
-登录mysql
-```shell
-mysql -uroot -padmin123
-```
-创建数据库
-```mysql
-CREATE DATABASE `go-oj_user_srv` DEFAULT CHARACTER SET utf8mb4
-CREATE DATABASE `go-oj_question_srv` DEFAULT CHARACTER SET utf8mb4
-```
-建表
-> 运行每个模块中test/build文件
-
-## 3.向consul写入远程配置
-```shell
-cd build
-go run build.go
+docker run -d --rm --name jaeger -p6831:6831/udp -p16686:16686 jaegertracing/all-in-one:latest
 ```
 
-## 4.依次启动srv服务与web服务
+## 2.在MySQL中创建相应的数据库
+运行xx_srv/build/main文件建表
+
+
+## 3.构建docker镜像
+使用 judge_srv/docker中的DockerFile
+
+## 4.启动
+ ./start.sh
 
