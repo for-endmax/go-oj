@@ -4,13 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"time"
 )
 
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	a := ""
-	time.Sleep(time.Second * 10)
 	for scanner.Scan() {
 		text := scanner.Text()
 		if text == "exit" {

@@ -6,4 +6,7 @@ ENV GOPROXY="https://goproxy.io"
 RUN mkdir -p /judge
 WORKDIR /judge
 
+
+RUN go install std
+
 ENTRYPOINT ["sleep", "infinity"]
