@@ -13,6 +13,7 @@ import (
 	"judge_srv/global"
 	"judge_srv/message"
 	"judge_srv/proto"
+	"strconv"
 )
 
 type MQ struct {
@@ -104,12 +105,13 @@ func (m *MQ) Run() {
 			opentracing.SetGlobalTracer(tracer)
 			headers := amqpTableCarrier{headers: d.Headers}
 			spanContext, err := tracer.Extract(opentracing.TextMap, headers)
+			judgeSpan := opentracing.StartSpan("judge", opentracing.ChildOf(spanContext))
+			ctx := opentracing.ContextWithSpan(context.Background(), judgeSpan)
 			if err != nil {
 				zap.S().Info("读取消息头错误")
 				closer.Close()
 				continue
 			}
-			judgeSpan := tracer.StartSpan("judge", opentracing.ChildOf(spanContext))
 
 			//读取消息体
 			var msgSend message.MsgSend
@@ -128,7 +130,7 @@ func (m *MQ) Run() {
 				closer.Close()
 				zap.S().Info("代码解码错误")
 				//返回回调信息
-				err = m.Reply(d, &message.MsgReply{
+				err = m.Reply(ctx, d, &message.MsgReply{
 					ID:        msgSend.ID,
 					Status:    1,
 					ErrCode:   1,
@@ -146,28 +148,32 @@ func (m *MQ) Run() {
 
 			// 进行判题
 			global.JudgeDone = make(chan struct{})
-			msgReply, err := Judge(msgSend)
+			msgReply, err := Judge(ctx, msgSend)
 			close(global.JudgeDone)
-			judgeSpan.LogKV("recordID", msgReply.ID, "status", msgReply.Status, "errCode", msgReply.ErrCode, "errMsg", msgReply.ErrMsg)
-			judgeSpan.Finish()
+
 			if err != nil {
 				closer.Close()
 				zap.S().Info("判题失败")
 				continue
 			}
 			//返回回调信息
-			err = m.Reply(d, msgReply)
+			err = m.Reply(ctx, d, msgReply)
 			if err != nil {
 				closer.Close()
 				continue
 			}
+			judgeSpan.LogKV("recordID", msgReply.ID, "status", msgReply.Status, "errCode", msgReply.ErrCode, "errMsg", msgReply.ErrMsg)
+			judgeSpan.Finish()
 			closer.Close()
 		}
 	}()
 }
 
 // Reply 返回信息
-func (m *MQ) Reply(d amqp.Delivery, msgReply *message.MsgReply) error {
+func (m *MQ) Reply(ctx context.Context, d amqp.Delivery, msgReply *message.MsgReply) error {
+	judgeSpan := opentracing.SpanFromContext(ctx)
+	replySpan := opentracing.StartSpan("reply", opentracing.ChildOf(judgeSpan.Context()))
+	defer replySpan.Finish()
 	msg, err := json.Marshal(msgReply)
 	if err != nil {
 		zap.S().Info("生成回调信息出错")
@@ -193,16 +199,19 @@ func (m *MQ) Reply(d amqp.Delivery, msgReply *message.MsgReply) error {
 }
 
 // Judge 判题
-func Judge(msgSend message.MsgSend) (*message.MsgReply, error) {
+func Judge(ctx context.Context, msgSend message.MsgSend) (*message.MsgReply, error) {
+	judgeSpan := opentracing.SpanFromContext(ctx)
 
+	createTaskSpan := opentracing.StartSpan("CreateTask", opentracing.ChildOf(judgeSpan.Context()))
 	// 创建task
 	task, err := CreateTask(msgSend)
 	if err != nil {
 		return nil, err
 	}
 	defer task.Clean()
+	createTaskSpan.Finish()
 	// 查询test信息
-	testInfos, err := global.QuestionSrvClient.GetTestInfo(context.Background(), &proto.GetTestRequest{
+	testInfos, err := global.QuestionSrvClient.GetTestInfo(ctx, &proto.GetTestRequest{
 		QId: task.msgSend.QID,
 	})
 	if err != nil {
@@ -219,6 +228,7 @@ func Judge(msgSend message.MsgSend) (*message.MsgReply, error) {
 	var totalTimeUsage int32 = 0
 	var totalMemUsage int32 = 0
 	for i, v := range testInfos.Data {
+		RunSpan := opentracing.StartSpan("runRecord:"+strconv.Itoa(i), opentracing.ChildOf(judgeSpan.Context()))
 		err, result := task.Run(v.Input, v.Output, i)
 		if err != nil {
 			zap.S().Info("判题出错")
@@ -230,6 +240,7 @@ func Judge(msgSend message.MsgSend) (*message.MsgReply, error) {
 		totalMemUsage += result.runMem
 		if result.ErrCode != 0 {
 			zap.S().Info("判题未通过")
+			RunSpan.Finish()
 			return &message.MsgReply{
 				ID:      task.msgSend.ID,
 				Status:  1,
@@ -237,6 +248,7 @@ func Judge(msgSend message.MsgSend) (*message.MsgReply, error) {
 				ErrMsg:  result.ErrMsg,
 			}, nil
 		}
+		RunSpan.Finish()
 	}
 	avgMemUsage, avgTimeUsage := totalMemUsage/testInfos.Total, totalTimeUsage/testInfos.Total
 	//判断是否超时或超内存

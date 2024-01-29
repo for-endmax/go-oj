@@ -171,8 +171,28 @@ func GetRecordListByUID(c *gin.Context) {
 	c.JSON(http.StatusOK, rsp)
 }
 
-// GetRecordByID 获取指定id的record的信息(长连接读取最新状态)
+// GetRecordByID 获取指定id的record的信息(长连接读取最新状态)SSE
 func GetRecordByID(c *gin.Context) {
+	//header设置
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("Access-Control-Allow-Origin", "*")
+
+	span := c.Value("parentSpan")
+	var ok bool
+	var parentSpan opentracing.Span
+	if parentSpan, ok = span.(opentracing.Span); !ok {
+		c.JSON(http.StatusInternalServerError, "内部错误")
+		return
+	}
+	v := c.Value("tracer")
+	var tracer opentracing.Tracer
+	if tracer, ok = v.(opentracing.Tracer); !ok {
+		c.JSON(http.StatusInternalServerError, "内部错误")
+		return
+	}
+
 	//获取参数
 	id, err := strconv.Atoi(c.Query("id"))
 	if err != nil {
@@ -199,13 +219,25 @@ func GetRecordByID(c *gin.Context) {
 		MemUsage:   recordInfo.MemUsage,
 		TimeUsage:  recordInfo.TimeUsage,
 	}
+	// 已经不是初始状态
 	if recordInfo.Status != 0 {
 		// 返回状态
-		c.JSON(http.StatusOK, rsp)
+		//c.JSON(http.StatusOK, rsp)
+		c.SSEvent("msg", gin.H{
+			"code": http.StatusOK,
+			"data": rsp,
+		})
+		c.Writer.Flush()
 		return
 	}
 	// 仍在判题,等待
 	zap.S().Info("查询到判题未结束,等待状态更新")
+	c.SSEvent("msg", gin.H{
+		"code": http.StatusNotModified,
+		"data": rsp,
+	})
+	c.Writer.Flush()
+
 	done := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
 	// 每2s读取一次redis，若有值说明状态更新了，超时时间为60s
@@ -216,12 +248,18 @@ func GetRecordByID(c *gin.Context) {
 				return
 			case <-time.Tick(time.Second * 2): //每两秒读取一次
 				zap.S().Info("读取redis中的值")
+				readRedis := tracer.StartSpan("readRedis", opentracing.ChildOf(parentSpan.Context()))
 				_, err := global.Redis.Get(context.Background(), strconv.Itoa(id)).Result()
+				readRedis.Finish()
 				if err != nil {
 					if !errors.Is(err, redis.Nil) {
 						zap.S().Infof("读取redis中的记录id: %s失败", strconv.Itoa(id))
 					}
 					zap.S().Info("状态未更新")
+					c.SSEvent("msg", gin.H{
+						"code": http.StatusNotModified,
+					})
+					c.Writer.Flush()
 					continue
 				}
 				//如果有，说明状态更新
@@ -232,17 +270,22 @@ func GetRecordByID(c *gin.Context) {
 		}
 	}(ctx)
 
+	newCtx := opentracing.ContextWithSpan(context.Background(), parentSpan)
 	select {
-	case <-time.After(time.Second * 60):
+	case <-time.After(global.SubmitTimeOut):
 		//超时
 		cancel()
 		zap.S().Info("超时,协程退出")
-		c.JSON(http.StatusNotModified, gin.H{})
+		c.SSEvent("msg", gin.H{
+			"code": http.StatusOK,
+			"data": rsp,
+		})
+		c.Writer.Flush()
 		return
 	case <-done:
 		cancel()
 		// 返回最新状态
-		recordInfo, err = global.RecordSrvClient.GetRecordByID(context.Background(), &proto.IDRequest{Id: int32(id)})
+		recordInfo, err = global.RecordSrvClient.GetRecordByID(newCtx, &proto.IDRequest{Id: int32(id)})
 		if err != nil {
 			HandleGrpcErrorToHttp(err, c)
 			return
@@ -261,7 +304,12 @@ func GetRecordByID(c *gin.Context) {
 			TimeUsage:  recordInfo.TimeUsage,
 			MemUsage:   recordInfo.MemUsage,
 		}
-		c.JSON(http.StatusOK, rsp)
+		//c.JSON(http.StatusOK, rsp)
+		c.SSEvent("msg", gin.H{
+			"code": http.StatusOK,
+			"data": rsp,
+		})
+		c.Writer.Flush()
 	}
 }
 
@@ -406,7 +454,7 @@ func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
 	}
 	//监听回调
 	go func() {
-		timer := time.After(time.Second * 60)
+		timer := time.After(global.SubmitTimeOut)
 		defer closer.Close()      //回调结束关闭tracer
 		defer parentSpan.Finish() // 回调结束后关闭起始的span
 		for {
@@ -414,7 +462,8 @@ func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
 			case <-timer:
 				//调用超时，更新record状态为-1
 				zap.S().Info("调用超时,内部错误,更新record状态为-1")
-				_, err := global.RecordSrvClient.UpdateRecord(context.WithValue(context.Background(), "ginContext", c), &proto.UpdateRecordRequest{
+				ctx := opentracing.ContextWithSpan(context.Background(), parentSpan)
+				_, err := global.RecordSrvClient.UpdateRecord(ctx, &proto.UpdateRecordRequest{
 					ID:     recordMsg.ID,
 					Status: -1,
 				})
@@ -439,7 +488,8 @@ func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
 						continue
 					}
 					// 更新record信息
-					_, err = global.RecordSrvClient.UpdateRecord(context.WithValue(context.Background(), "ginContext", c), &proto.UpdateRecordRequest{
+					ctx := opentracing.ContextWithSpan(context.Background(), parentSpan)
+					_, err = global.RecordSrvClient.UpdateRecord(ctx, &proto.UpdateRecordRequest{
 						ID:        msgReply.ID,
 						Status:    msgReply.Status,
 						ErrCode:   msgReply.ErrCode,
@@ -451,6 +501,7 @@ func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
 						zap.S().Infof("record信息更新失败  %s", err.Error())
 						return
 					}
+
 					// 向redis写值，通知信息更新
 					redisSpan := tracer.StartSpan("updateRedis", opentracing.ChildOf(parentSpan.Context()))
 					_, err = global.Redis.Set(context.Background(), strconv.Itoa(int(msgReply.ID)), 1, time.Second*60).Result()

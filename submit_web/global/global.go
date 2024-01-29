@@ -8,6 +8,7 @@ import (
 	"github.com/streadway/amqp"
 	"submit_web/config"
 	"submit_web/proto"
+	"time"
 )
 
 var (
@@ -23,6 +24,8 @@ var (
 )
 var JWTSigningKey string = "endmax" //JWT签名
 var JudgeQueue string = "judge_queue"
+
+var SubmitTimeOut = time.Second * 30 //提交超时时间
 
 // MsgSend 通过mq发送的记录信息
 type MsgSend struct {

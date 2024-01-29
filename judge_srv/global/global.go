@@ -5,6 +5,7 @@ import (
 	"github.com/streadway/amqp"
 	"judge_srv/config"
 	"judge_srv/proto"
+	"time"
 )
 
 var (
@@ -18,3 +19,5 @@ var (
 var JudgeQueue string = "judge_queue"
 
 var JudgeDone chan struct{}
+
+var ExecTimeOut = time.Second * 5

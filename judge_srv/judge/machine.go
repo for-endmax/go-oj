@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/go-uuid"
 	"go.uber.org/zap"
 	"io"
+	"judge_srv/global"
 	"judge_srv/message"
 	"os"
 	"path"
@@ -103,10 +104,10 @@ func CreateTask(msgSend message.MsgSend) (task *Task, err error) {
 					Target: "/judge",
 				},
 			},
-			//Resources: container.Resources{
-			//	NanoCPUs: 1000000000 * 0.9,  // 总共是10^9
-			//	Memory:   1024 * 1024 * 100, // 100MB
-			//},
+			Resources: container.Resources{
+				NanoCPUs: 1000000000 * 0.3,  // 总共是10^9
+				Memory:   1024 * 1024 * 100, // 100MB
+			},
 		}, nil, nil, task.uuid) // uuid作为container的名称
 	if err != nil {
 		zap.S().Info("创建容器失败")
@@ -311,7 +312,7 @@ func (t *Task) Exec(cmd string, testData string) (*Output, error) {
 	}()
 
 	select {
-	case <-time.After(time.Second * 20):
+	case <-time.After(global.ExecTimeOut):
 		return &Output{
 			msg:      []byte("程序运行超时"),
 			exitCode: 2001,
