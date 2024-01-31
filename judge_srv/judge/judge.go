@@ -14,6 +14,7 @@ import (
 	"judge_srv/message"
 	"judge_srv/proto"
 	"strconv"
+	"time"
 )
 
 type MQ struct {
@@ -159,6 +160,7 @@ func (m *MQ) Run() {
 				return
 			}
 			judgeSpan.LogKV("recordID", msgReply.ID, "status", msgReply.Status, "errCode", msgReply.ErrCode, "errMsg", msgReply.ErrMsg)
+			time.Sleep(time.Millisecond * 100)
 		}()
 	}
 }
