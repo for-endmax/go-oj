@@ -74,7 +74,7 @@ cd submit_web
 pids+=($!)
 cd ..
 
-echo "启动 2个judge_srv..."
+echo "启动 3个judge_srv..."
 cd judge_srv
 /usr/local/go/bin/go run main.go >/dev/null 2>&1  &
 pids+=($!)
@@ -82,6 +82,8 @@ pids+=($!)
 /usr/local/go/bin/go run main.go >/dev/null 2>&1  &
 pids+=($!)
 
+/usr/local/go/bin/go run main.go >/dev/null 2>&1  &
+pids+=($!)
 # 进入无限循环，保持脚本运行
 while true; do
     # 在这里可以添加一些逻辑，以确保脚本一直在运行

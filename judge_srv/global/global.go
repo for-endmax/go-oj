@@ -19,5 +19,5 @@ var (
 var JudgeQueue string = "judge_queue"
 
 // var JudgeDone chan struct{}
-var Qos = 20
+var Qos = 10
 var ExecTimeOut = time.Second * 1

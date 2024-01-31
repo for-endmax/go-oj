@@ -218,7 +218,7 @@ func (t *Task) Run(testInput string, testOutput string, num int) (error, *Result
 	return nil, &result
 }
 
-// GetResource 获取时间(ms),内存KB  -1000:0.00
+// GetResource 获取时间(ms),内存KB  -1000:0.00~/n  /n-1000:0.00~
 func GetResource(msg []byte) (time int32, mem int32, realMsg string, err error) {
 	n := len(msg)
 	timeStr := ""
@@ -246,6 +246,7 @@ func GetResource(msg []byte) (time int32, mem int32, realMsg string, err error) 
 			tmp = append(tmp, msg[i])
 		}
 	}
+	zap.S().Info(string(msg), ",", realMsg, ",", timeStr, ",", memStr)
 	// 将字符串转换为浮点数
 	f, err := strconv.ParseFloat(timeStr, 64)
 	if err != nil {
@@ -253,7 +254,6 @@ func GetResource(msg []byte) (time int32, mem int32, realMsg string, err error) 
 		return 0, 0, "", err
 	}
 	time = int32(f * 1000)
-
 	m, err := strconv.Atoi(memStr)
 	if err != nil {
 		zap.S().Info("转换失败:", err)
