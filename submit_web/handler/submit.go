@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	sentinel "github.com/alibaba/sentinel-golang/api"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/go-redis/redis/v8"
@@ -315,7 +316,6 @@ func GetRecordByID(c *gin.Context) {
 
 // Submit 提交代码
 func Submit(c *gin.Context) {
-
 	// 读取表单
 	var submitForm form.SubmitForm
 	if err := c.ShouldBindJSON(&submitForm); err != nil {
@@ -364,7 +364,7 @@ func Submit(c *gin.Context) {
 	err = Send2MQ(c, recordMsg)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"msg":       "内部错误",
+			"msg":       "内部错误: " + err.Error(),
 			"record_id": record.ID,
 		})
 		return
@@ -378,6 +378,12 @@ func Submit(c *gin.Context) {
 
 // Send2MQ 发送消息并监听回调
 func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
+	// 创建entry
+	e, b := sentinel.Entry("submit")
+	if b != nil {
+		return errors.New("请求过于频繁")
+	}
+
 	span := c.Value("parentSpan")
 	var ok bool
 	var parentSpan opentracing.Span
@@ -471,6 +477,7 @@ func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
 					zap.S().Info("更新record状态为-1出错")
 					return
 				}
+				sentinel.TraceError(e, errors.New("超时未得到返回"))
 				return
 			case d, ok := <-msgs:
 				if !ok {
@@ -511,6 +518,8 @@ func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
 						return
 					}
 					_ = d.Ack(false)
+					//正确返回
+					e.Exit()
 					return
 				}
 			}

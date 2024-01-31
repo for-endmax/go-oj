@@ -223,8 +223,18 @@ func GetResource(msg []byte) (time int32, mem int32, realMsg string, err error) 
 	n := len(msg)
 	timeStr := ""
 	memStr := ""
-	tmp := []byte{}
+	var tmp []byte
+	var flag bool
 	for i := n - 2; i >= 0; i-- {
+		if msg[i] == '~' {
+			flag = true
+		}
+		if !flag {
+			continue
+		}
+		if msg[i] == '~' {
+			continue
+		}
 		if msg[i] == ':' {
 			timeStr = string(reverse(tmp))
 			tmp = []byte{}

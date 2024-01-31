@@ -20,6 +20,7 @@ func main() {
 	initialize.InitRouter()       // 初始化路由
 	initialize.Run()              // 启动服务
 	initialize.Register()         // 服务注册
+	initialize.InitSentinel()     // 初始化sentinel
 	//接收终止信号
 	quit := make(chan os.Signal)
 	//接收control+c
