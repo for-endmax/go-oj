@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	sentinel "github.com/alibaba/sentinel-golang/api"
+	"github.com/alibaba/sentinel-golang/core/base"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/go-redis/redis/v8"
@@ -316,6 +317,14 @@ func GetRecordByID(c *gin.Context) {
 
 // Submit 提交代码
 func Submit(c *gin.Context) {
+	// 创建entry
+	e, b := sentinel.Entry("submit")
+	if b != nil {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"msg": "服务繁忙，请稍后再试",
+		})
+		return
+	}
 	// 读取表单
 	var submitForm form.SubmitForm
 	if err := c.ShouldBindJSON(&submitForm); err != nil {
@@ -361,7 +370,7 @@ func Submit(c *gin.Context) {
 		QID:        record.QID,
 	}
 
-	err = Send2MQ(c, recordMsg)
+	err = Send2MQ(c, recordMsg, e)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"msg":       "内部错误: " + err.Error(),
@@ -377,13 +386,8 @@ func Submit(c *gin.Context) {
 }
 
 // Send2MQ 发送消息并监听回调
-func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
-	// 创建entry
-	e, b := sentinel.Entry("submit")
-	if b != nil {
-		return errors.New("请求过于频繁")
-	}
-
+func Send2MQ(c *gin.Context, recordMsg global.MsgSend, e *base.SentinelEntry) error {
+	// 链路跟踪
 	span := c.Value("parentSpan")
 	var ok bool
 	var parentSpan opentracing.Span
@@ -508,7 +512,7 @@ func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
 						zap.S().Infof("record信息更新失败  %s", err.Error())
 						return
 					}
-
+					time.Sleep(time.Millisecond * 100)
 					// 向redis写值，通知信息更新
 					redisSpan := tracer.StartSpan("updateRedis", opentracing.ChildOf(parentSpan.Context()))
 					_, err = global.Redis.Set(context.Background(), strconv.Itoa(int(msgReply.ID)), 1, time.Second*60).Result()
@@ -530,6 +534,14 @@ func Send2MQ(c *gin.Context, recordMsg global.MsgSend) error {
 
 // Retry 重试（提交后记录创建成功但是未判题，status=-1）
 func Retry(c *gin.Context) {
+	// 创建entry
+	e, b := sentinel.Entry("submit")
+	if b != nil {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"msg": "服务繁忙，请稍后再试",
+		})
+		return
+	}
 	// 解析id
 	id, err := strconv.Atoi(c.Query("id"))
 	if err != nil {
@@ -578,7 +590,7 @@ func Retry(c *gin.Context) {
 		TimeLimit:  record.TimeLimit,
 		QID:        record.QID,
 	}
-	err = Send2MQ(c, recordMsg)
+	err = Send2MQ(c, recordMsg, e)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, "内部错误")
 		return

@@ -12,16 +12,16 @@ func InitSentinel() {
 		zap.S().Fatalf("初始化sentinel 异常: %v", err)
 	}
 
-	//基于错误率
+	//基于慢请求
 	_, err = circuitbreaker.LoadRules([]*circuitbreaker.Rule{
 		{
 			Resource:         "submit",
 			Strategy:         circuitbreaker.SlowRequestRatio,
-			RetryTimeoutMs:   3000,
-			MinRequestAmount: 5,
-			StatIntervalMs:   10000,
-			MaxAllowedRtMs:   3000,
-			Threshold:        0.2,
+			RetryTimeoutMs:   10000,
+			MinRequestAmount: 2, //静默
+			StatIntervalMs:   20000,
+			MaxAllowedRtMs:   2000,
+			Threshold:        0.4,
 		},
 	})
 	if err != nil {

@@ -194,7 +194,7 @@ func (t *Task) Run(testInput string, testOutput string, num int) (error, *Result
 		}
 	}
 
-	//获取时间 0.00
+	//获取时间和内存信息
 	runTime, runMem, realMsg, err := GetResource(runOutput.msg)
 	if err != nil {
 		return err, nil
@@ -250,14 +250,14 @@ func GetResource(msg []byte) (time int32, mem int32, realMsg string, err error) 
 	f, err := strconv.ParseFloat(timeStr, 64)
 	if err != nil {
 		zap.S().Info("转换失败:", err)
-		return 0, 0, "", nil
+		return 0, 0, "", err
 	}
 	time = int32(f * 1000)
 
 	m, err := strconv.Atoi(memStr)
 	if err != nil {
 		zap.S().Info("转换失败:", err)
-		return 0, 0, "", nil
+		return 0, 0, "", err
 	}
 	mem = int32(m)
 	return

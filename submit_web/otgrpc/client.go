@@ -44,6 +44,11 @@ func OpenTracingClientInterceptor(tracer opentracing.Tracer, optFuncs ...Option)
 		if parent := opentracing.SpanFromContext(ctx); parent != nil {
 			parentCtx = parent.Context()
 		}
+
+		if otgrpcOpts.inclusionFunc != nil &&
+			!otgrpcOpts.inclusionFunc(parentCtx, method, req, resp) {
+			return invoker(ctx, method, req, resp, cc, opts...)
+		}
 		/////修改
 		ginContext := ctx.Value("ginContext")
 		switch ginContext.(type) {
@@ -56,10 +61,6 @@ func OpenTracingClientInterceptor(tracer opentracing.Tracer, optFuncs ...Option)
 			}
 		}
 		/////
-		if otgrpcOpts.inclusionFunc != nil &&
-			!otgrpcOpts.inclusionFunc(parentCtx, method, req, resp) {
-			return invoker(ctx, method, req, resp, cc, opts...)
-		}
 		clientSpan := tracer.StartSpan(
 			method,
 			opentracing.ChildOf(parentCtx),
